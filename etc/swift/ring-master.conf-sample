@@ -1,0 +1,54 @@
+[ringmasterd]
+
+#standard swift logger settings
+log_facility = LOG_LOCAL0
+
+#swiftdir = /etc/swift
+
+# path to your builder files
+#account_builder = /etc/swift/account.builder
+#container_builder = /etc/swift/container.builder
+#object_builder = /etc/swift/object.builder
+
+# path to your ring files
+#account_ring = /etc/swift/account.ring.gz
+#container_ring = /etc/swift/container.ring.gz
+#object_ring = /etc/swift/object.ring.gz
+
+# where to backup builder and ring files
+#backup_dir = /etc/swift/backups
+
+# weight shift [in|de]crement (by how much to change the weight on a pass)
+#weight_shift = 5.0
+
+# how often to check for changes
+#interval = 120
+
+# how long to wait to check again after making a change
+#change_interval = 300
+
+# max oop pct threshold - why is this still here?
+#oopmax = 5.0
+
+# minimum time we must wait after a builder file has been externally changed
+# if you're adding nodes this gives you a grace period to make changes before
+# ring orchestration kicks in and starts deploying the ring
+#min_seconds_since_change = 10
+
+# dispersion report pct found thresholds
+# if a disperion report finds less than this pct no change will be made
+#container_min_pct = 99.50
+#object_min_pct = 99.50
+
+[ringmaster_wsgi]
+#standard swift logger settings
+log_facility = LOG_LOCAL0
+
+#swiftdir = /etc/swift
+# Whether the ring master wsgi app should be spun up to serve up copies of
+# the rings.
+#enabled = false
+# Listen on this port
+#serve_ring_port = 8090
+# Bind to this address (or empty for all)
+#server_ring_address =
