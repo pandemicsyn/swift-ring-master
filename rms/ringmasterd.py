@@ -9,12 +9,11 @@ import subprocess
 import cPickle as pickle
 from time import time
 from datetime import datetime
-from rms.daemonutils import Daemon
 from rms.ringmasterwsgi import RingMasterApp
-from rms.utils import get_md5sum, make_backup
+from rms.utils import get_md5sum, make_backup, Daemon
 from os import stat
 from swift.common.ring import RingBuilder, Ring
-from swift.common.utils import get_logger, readconf
+from swift.common.utils import get_logger, readconf, TRUE_VALUES
 from swift.common import exceptions
 
 try:
@@ -26,7 +25,6 @@ except ImportError:
 class RingMasterServer(object):
 
     def __init__(self, rms_conf):
-        TRUE_VALUES = set(('true', '1', 'yes', 'on', 't', 'y'))
         conf = rms_conf['ringmasterd']
         self.swiftdir = conf.get('swiftdir', '/etc/swift')
         self.builder_files = \
@@ -56,7 +54,6 @@ class RingMasterServer(object):
                                                            '99.50')),
                                'object': float(conf.get('object_min_pct',
                                                         '99.50'))}
-        print self.debug
         self.logger = get_logger(conf, 'ringmasterd', self.debug)
         self.serve_ring = rms_conf['ringmaster_wsgi'].get('enabled', 'n') in TRUE_VALUES
         if self.serve_ring:
@@ -383,8 +380,8 @@ def run_server():
     args = optparse.OptionParser(usage)
     args.add_option('--foreground', '-f', action="store_true",
                     help="Run in foreground, in debug mode")
-    args.add_option('--conf', default="./rmsd.conf",
-                    help="path to config. default = ./rmsd.conf")
+    args.add_option('--conf', default="/etc/swift/ring-master.conf",
+                    help="path to config. default /etc/swift/ring-master.conf")
     options, arguments = args.parse_args()
 
     if len(sys.argv) <= 1:

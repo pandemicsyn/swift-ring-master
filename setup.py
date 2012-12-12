@@ -27,5 +27,5 @@ setup(
         'Environment :: No Input/Output (Daemon)',
         ],
     install_requires=install_requires,
-    scripts=['bin/swift-ring-master-server']
+    scripts=['bin/swift-ring-master-server','bin/swift-ring-minion-server']
     )

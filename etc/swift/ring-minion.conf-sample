@@ -1,0 +1,23 @@
+[minion]
+#standard swift log options
+log_facility = LOG_LOCAL0
+
+#swiftdir
+#swiftdir = /etc/swift
+
+# path to your ring files
+#account_ring = /etc/swift/account.ring.gz
+#container_ring = /etc/swift/container.ring.gz
+#object_ring = /etc/swift/object.ring.gz
+
+# insert a random sleep at startup to so that requests from minions 
+# are a bit random. tl;dr try not to stampede a ring master on a restart
+#start_delay_range = 120
+
+# url for the ring master server
+#ring_master = http://127.0.0.1:8090
+# timeout for the ring master server
+#ring_master_timeout = 300
+
+# debug mode
+#debug = false
