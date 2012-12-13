@@ -3,9 +3,9 @@ from os import mkdir
 from os.path import basename, join as pathjoin
 from shutil import copy
 from errno import EEXIST
-import sys, os, time, atexit
+import sys, os, atexit
 from signal import SIGTERM
-
+from time import time
 
 def get_md5sum(filename, chunk_size=4096):
     """Get the md5sum of a file

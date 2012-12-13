@@ -48,9 +48,10 @@ class RingMasterServer(object):
         self.recheck_interval = int(conf.get('interval', '120'))
         self.recheck_after_change_interval = int(conf.get('change_interval',
                                                           '120'))
+        self.mph_enabled = conf.get('min_part_hours_check', 'n') in TRUE_VALUES
         self.sec_since_modified = int(conf.get('min_seconds_since_change',
                                                '10'))
-        self.dsp_pct_limits = {'container': float(conf.get('container_min_pct',
+        self.dispersion_pct = {'container': float(conf.get('container_min_pct',
                                                            '99.50')),
                                'object': float(conf.get('object_min_pct',
                                                         '99.50'))}
@@ -242,8 +243,7 @@ class RingMasterServer(object):
         builder_file = self.builder_files[btype]
         backup, backup_md5 = make_backup(builder_file, self.backup_dir)
         self.logger.notice(
-            '--> Backed up %s to %s (%s)' % builder_file, backup,
-            backup_md5)
+            '--> Backed up %s to %s (%s)' % (builder_file, backup, backup_md5))
         eventlet.sleep()
         pickle.dump(builder.to_dict(), open(builder_file, 'wb'), protocol=2)
         return get_md5sum(builder_file)
@@ -257,8 +257,8 @@ class RingMasterServer(object):
         """
         ring_file = self.ring_files[btype]
         backup, backup_md5 = make_backup(ring_file, self.backup_dir)
-        self.logger.notice('--> Backed up %s to %s (%s)' % ring_file, backup,
-                           backup_md5)
+        self.logger.notice('--> Backed up %s to %s (%s)' % (ring_file, backup,
+                                                            backup_md5))
         builder.get_ring().save(ring_file)
         return get_md5sum(ring_file)
 
@@ -274,13 +274,15 @@ class RingMasterServer(object):
             if self.ring_requires_change(builder):
                 self.logger.notice(
                     "[%s] -> ring requires weight change." % btype)
-                if not self.min_part_hours_ok(builder):
-                    self.logger.notice(
-                        "[%s] -> Ring min_part_hours: not ready!" % btype)
-                    continue
-                else:
-                    self.logger.notice(
-                        "[%s] -> Ring min_part_hours: ok" % btype)
+
+                if self.mph_enabled:
+                    if not self.min_part_hours_ok(builder):
+                        self.logger.notice(
+                            "[%s] -> Ring min_part_hours: not ready!" % btype)
+                        continue
+                    else:
+                        self.logger.notice(
+                            "[%s] -> Ring min_part_hours: ok" % btype)
 
                 if not self.min_modify_time(btype):
                     self.logger.notice(
