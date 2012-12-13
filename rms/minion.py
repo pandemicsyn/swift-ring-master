@@ -4,10 +4,9 @@ import eventlet
 import optparse
 from random import choice
 from eventlet.green import urllib2
-from swift.common.ring import Ring
 from tempfile import mkstemp
 from os.path import basename, dirname, join as pathjoin, exists
-from rms.utils import Daemon, get_md5sum
+from rms.utils import Daemon, get_md5sum, is_valid_ring
 from swift.common.utils import get_logger, readconf, TRUE_VALUES
 
 
@@ -15,8 +14,8 @@ class RingMinion(object):
 
     def __init__(self, conf):
         self.current_md5 = {}
-        #self.rings = {'test': 'test.ring.gz'}
-        #self.swiftdir = '/etc/swift-test'
+        # self.rings = {'test': 'test.ring.gz'}
+        # self.swiftdir = '/etc/swift-test'
         self.swiftdir = conf.get('swiftdir', '/etc/swift')
         self.rings = {'account': conf.get('account_ring',
                                           '/etc/swift/account.ring.gz'),
@@ -32,7 +31,8 @@ class RingMinion(object):
         self.logger = get_logger(conf, 'ringminiond')
         for ring in self.rings:
             if exists(self.rings[ring]):
-                self.current_md5[self.rings[ring]] = get_md5sum(self.rings[ring])
+                self.current_md5[self.rings[ring]] = \
+                    get_md5sum(self.rings[ring])
             else:
                 continue
 
@@ -41,18 +41,6 @@ class RingMinion(object):
             return True
         else:
             return False
-
-    def is_valid_ring(self, ring_file):
-        try:
-            ring = Ring(ring_file)
-            if len(ring.devs) < 1:
-                return False
-            if not ring.get_part_nodes(1):
-                return False
-        except Exception:
-            self.logger.exception('Error validating ring.')
-            return False
-        return True
 
     def ring_updated(self, ring_type):
         """update a ring
@@ -85,8 +73,9 @@ class RingMinion(object):
                     fdo.flush()
                     os.fsync(fdo)
                     if self.md5matches(tmppath, expected_md5):
-                        if not self.is_valid_ring(tmppath):
+                        if not is_valid_ring(tmppath):
                             os.unlink(tmppath)
+                            self.logger.error('error validating ring')
                             return False
                         os.rename(tmppath, self.rings[ring_type])
                         self.current_md5[self.rings[ring_type]] = expected_md5
@@ -112,7 +101,7 @@ class RingMinion(object):
 
     def watch_loop(self):
         while True:
-            #insert a random delay on startup so we don't flood the server
+            # insert a random delay on startup so we don't flood the server
             eventlet.sleep(choice(range(self.start_delay)))
             try:
                 for ring in self.rings:

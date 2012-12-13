@@ -1,11 +1,15 @@
 from hashlib import md5
 from os import mkdir
+from swift.common.ring import Ring
 from os.path import basename, join as pathjoin
 from shutil import copy
 from errno import EEXIST
-import sys, os, atexit
+import sys
+import os
+import atexit
 from signal import SIGTERM
 from time import time
+
 
 def get_md5sum(filename, chunk_size=4096):
     """Get the md5sum of a file
@@ -38,25 +42,21 @@ def make_backup(filename, backup_dir):
     copy(filename, backup)
     return [backup, get_md5sum(backup)]
 
-# def get_logger(with_console=False):
-#    logger = logging.getLogger('ringmasterd')
-#    logger.setLevel(logging.DEBUG)
-#    syslog = SysLogHandler(address='/dev/log')
-#    syslog_formatter = logging.Formatter('%(name)s: %(message)s')
-#    syslog.setFormatter(syslog_formatter)
-#    logger.addHandler(syslog)
-#    if with_console:
-#        ch = logging.StreamHandler()
-#        ch_formatter = logging.Formatter("%(message)s")
-#        ch.setFormatter(ch_formatter)
-#        ch.setLevel(logging.DEBUG)
-#        logger.addHandler(ch)
-#    return logger
-#!/usr/bin/env python
+
+def is_valid_ring(ring_file):
+    try:
+        ring = Ring(ring_file)
+        if len(ring.devs) < 1:
+            return False
+        if not ring.get_part_nodes(1):
+            return False
+    except Exception:
+        return False
+    return True
+
+# http://www.jejik.com/articles/2007/02/a_simple_unix_linux_daemon_in_python/
 
 
-
-#http://www.jejik.com/articles/2007/02/a_simple_unix_linux_daemon_in_python/
 class Daemon:
     """
     A generic daemon class.
@@ -160,14 +160,14 @@ class Daemon:
             return  # not an error in a restart
 
         try:
-                while 1:
-                        os.kill(pid, SIGTERM)
-                        time.sleep(0.1)
+            while 1:
+                os.kill(pid, SIGTERM)
+                time.sleep(0.1)
         except OSError, err:
-                err = str(err)
-                if err.find("No such process") > 0:
-                        if os.path.exists(self.pidfile):
-                                os.remove(self.pidfile)
-                else:
-                        print str(err)
-                        sys.exit(1)
+            err = str(err)
+            if err.find("No such process") > 0:
+                if os.path.exists(self.pidfile):
+                    os.remove(self.pidfile)
+            else:
+                print str(err)
+                sys.exit(1)

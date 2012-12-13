@@ -5,6 +5,7 @@ from os.path import exists, join as pathjoin
 from swift.common.utils import split_path, get_logger
 from rms.utils import get_md5sum
 
+
 class FileIterable(object):
     def __init__(self, filename):
         self.filename = filename
@@ -32,6 +33,7 @@ class FileIterator(object):
 
     __next__ = next
 
+
 class FileLikeLogger(object):
 
     def __init__(self, logger):
@@ -39,6 +41,7 @@ class FileLikeLogger(object):
 
     def write(self, message):
         self.logger.info(message)
+
 
 class RingMasterApp(object):
     """Ring Master wsgi app to serve up the ring the files"""

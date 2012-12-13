@@ -10,8 +10,9 @@ import cPickle as pickle
 from time import time
 from datetime import datetime
 from rms.ringmasterwsgi import RingMasterApp
-from rms.utils import get_md5sum, make_backup, Daemon
-from os import stat
+from rms.utils import get_md5sum, make_backup, Daemon, is_valid_ring
+from os import stat, unlink, rename, close, fdopen
+from tempfile import mkstemp
 from swift.common.ring import RingBuilder, Ring
 from swift.common.utils import get_logger, readconf, TRUE_VALUES
 from swift.common import exceptions
@@ -51,12 +52,14 @@ class RingMasterServer(object):
         self.mph_enabled = conf.get('min_part_hours_check', 'n') in TRUE_VALUES
         self.sec_since_modified = int(conf.get('min_seconds_since_change',
                                                '10'))
+        self.balance_threshold = int(conf.get('balance_threshold', '2'))
         self.dispersion_pct = {'container': float(conf.get('container_min_pct',
                                                            '99.50')),
                                'object': float(conf.get('object_min_pct',
                                                         '99.50'))}
         self.logger = get_logger(conf, 'ringmasterd', self.debug)
-        self.serve_ring = rms_conf['ringmaster_wsgi'].get('enabled', 'n') in TRUE_VALUES
+        self.serve_ring = rms_conf['ringmaster_wsgi'].get(
+            'enabled', 'n') in TRUE_VALUES
         if self.serve_ring:
             self.wsgi_app = RingMasterApp(conf=rms_conf['ringmaster_wsgi'])
         else:
@@ -228,7 +231,7 @@ class RingMasterServer(object):
         if self.debug:
             self.logger.notice(
                 '--> Current balance: %.02f' % builder.get_balance())
-        if builder.get_balance() > 5:
+        if builder.get_balance() > self.balance_threshold:
             return False
         else:
             return True
@@ -244,8 +247,9 @@ class RingMasterServer(object):
         backup, backup_md5 = make_backup(builder_file, self.backup_dir)
         self.logger.notice(
             '--> Backed up %s to %s (%s)' % (builder_file, backup, backup_md5))
-        eventlet.sleep()
-        pickle.dump(builder.to_dict(), open(builder_file, 'wb'), protocol=2)
+        fd, tmppath = mkstemp(dir=self.swiftdir, suffix='.tmp.builder')
+        pickle.dump(builder.to_dict(), fdopen(fd, 'wb'), protocol=2)
+        rename(tmppath, builder_file)
         return get_md5sum(builder_file)
 
     def write_ring(self, btype, builder):
@@ -259,7 +263,13 @@ class RingMasterServer(object):
         backup, backup_md5 = make_backup(ring_file, self.backup_dir)
         self.logger.notice('--> Backed up %s to %s (%s)' % (ring_file, backup,
                                                             backup_md5))
-        builder.get_ring().save(ring_file)
+        fd, tmppath = mkstemp(dir=self.swiftdir, suffix='.tmp.ring.gz')
+        builder.get_ring().save(tmppath)
+        close(fd)
+        if not is_valid_ring(tmppath):
+            unlink(tmppath)
+            raise Exception('Ring Validate Failed')
+        rename(tmppath, ring_file)
         return get_md5sum(ring_file)
 
     def orchestration_pass(self):
@@ -324,13 +334,16 @@ class RingMasterServer(object):
                     else:
                         self.logger.notice("[%s] -> Rebalance: ok" % btype)
                 self.logger.notice("[%s] -> Writing builder..." % btype)
-                builder_md5 = self.write_builder(btype, builder)
-                self.logger.notice("[%s] --> Wrote new builder with md5: %s" %
-                                  (btype, builder_md5))
-                self.logger.notice("[%s] -> Writing ring..." % btype)
-                ring_md5 = self.write_ring(btype, builder)
-                self.logger.notice("[%s] --> Wrote new ring with md5: %s" %
-                                  (btype, ring_md5))
+                try:
+                    builder_md5 = self.write_builder(btype, builder)
+                    self.logger.notice("[%s] --> Wrote new builder with md5: %s" %
+                                       (btype, builder_md5))
+                    self.logger.notice("[%s] -> Writing ring..." % btype)
+                    ring_md5 = self.write_ring(btype, builder)
+                    self.logger.notice("[%s] --> Wrote new ring with md5: %s" %
+                                       (btype, ring_md5))
+                except Exception:
+                    self.logger.exception('Error dumping builder or ring')
             else:
                 self.logger.notice("[%s] -> No ring change required" % btype)
                 continue
