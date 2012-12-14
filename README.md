@@ -4,8 +4,7 @@ swift-ring-master
 The swift-ring-master-server is a simple daemon that automates ring and ring
 builder change. When it see's that a devices weight does not equal its "target" 
 weight it will incrementally adjust, rebalance, and deploy the ring until the 
-device(s) reach their target weight. It also includes a simple optional wsgi 
-server that can serve up ring files.
+device(s) reach their target weight.
 
 It attempts to make builder/ring changes in a "safe" fashion by taking
 into account:
@@ -16,6 +15,9 @@ into account:
 - Checking dispersion reports to verify cluster health
 - ~~Verifying out of place partition percentages across the cluster~~ [no longer present in this version]
 - Only adjusting the device(s) by user defined (de|inc)rements
+
+swift-ring-master-wsgi
+======================
 
 The optional wsgi app provides a simple interface to remotely checking for changes and retrieving rings:
 

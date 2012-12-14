@@ -9,7 +9,6 @@ import subprocess
 import cPickle as pickle
 from time import time
 from datetime import datetime
-from rms.ringmasterwsgi import RingMasterApp
 from rms.utils import get_md5sum, make_backup, Daemon, is_valid_ring
 from os import stat, unlink, rename, close, fdopen
 from tempfile import mkstemp
@@ -58,12 +57,6 @@ class RingMasterServer(object):
                                'object': float(conf.get('object_min_pct',
                                                         '99.50'))}
         self.logger = get_logger(conf, 'ringmasterd', self.debug)
-        self.serve_ring = rms_conf['ringmaster_wsgi'].get(
-            'enabled', 'n') in TRUE_VALUES
-        if self.serve_ring:
-            self.wsgi_app = RingMasterApp(conf=rms_conf['ringmaster_wsgi'])
-        else:
-            self.wsgi_app = None
 
     def get_ring_hosts(self, zone_filter, swift_dir, ring_name):
         """
@@ -105,8 +98,9 @@ class RingMasterServer(object):
         if not devs_changed and abs(last_balance - balance) < 1:
             self.logger.notice("-> Rebalance failed to change more than 1%!")
             return False
-        self.logger.notice('--> Reassigned %d (%.02f%%) partitions. Balance is %.02f.' %
-                          (parts, 100.0 * parts / builder.parts, balance))
+        self.logger.notice('--> Reassigned %d (%.02f%%) partitions. Balance '
+                           'is %.02f.' % (parts, 100.0 * parts / builder.parts,
+                                          balance))
         return True
 
     def adjust_ring(self, builder):
@@ -200,8 +194,8 @@ class RingMasterServer(object):
         elapsed_hours = int(time() - builder._last_part_moves_epoch) / 3600
         if self.debug:
             self.logger.notice('--> partitions last moved %d hours ago [%s]'
-                               % (elapsed_hours,
-                                  datetime.utcfromtimestamp(builder._last_part_moves_epoch)))
+                               % (elapsed_hours, datetime.utcfromtimestamp(
+                                   builder._last_part_moves_epoch)))
         if elapsed_hours > builder.min_part_hours:
             return True
         else:
@@ -319,29 +313,33 @@ class RingMasterServer(object):
                     if not rebalanced:
                         self.logger.notice(
                             "[%s] -> Rebalance: not ready!" % btype)
+                        ring_changed = True # we should sleep a bit longer
                         continue
                     else:
                         self.logger.notice("[%s] -> Rebalance: ok" % btype)
                 else:
                     self.logger.notice(
                         "[%s] -> Current Ring balance: not ready!" % btype)
-                    self.logger.notice("[%s] -> Rebalancing ring with no modifications..." % btype)
+                    self.logger.notice('[%s] -> Rebalancing ring with no '
+                                       'modifications...' % btype)
                     rebalanced = self.rebalance_ring(builder)
                     if not rebalanced:
                         self.logger.notice(
                             "[%s] -> Rebalance: not ready!" % btype)
+                        ring_changed = True # we should sleep a bit longer
                         continue
                     else:
                         self.logger.notice("[%s] -> Rebalance: ok" % btype)
                 self.logger.notice("[%s] -> Writing builder..." % btype)
                 try:
                     builder_md5 = self.write_builder(btype, builder)
-                    self.logger.notice("[%s] --> Wrote new builder with md5: %s" %
-                                       (btype, builder_md5))
+                    self.logger.notice('[%s] --> Wrote new builder with md5: '
+                                       '%s' % (btype, builder_md5))
                     self.logger.notice("[%s] -> Writing ring..." % btype)
                     ring_md5 = self.write_ring(btype, builder)
                     self.logger.notice("[%s] --> Wrote new ring with md5: %s" %
                                        (btype, ring_md5))
+                    ring_changed = True
                 except Exception:
                     self.logger.exception('Error dumping builder or ring')
             else:
@@ -352,22 +350,9 @@ class RingMasterServer(object):
         else:
             eventlet.sleep(self.recheck_interval)
 
-    def run_wsgi(self):
-        """Run the wsgi server to serve up the ring files"""
-        while True:
-            try:
-                self.wsgi_app.run()
-            except Exception:
-                # sleep 60 seconds before we try again
-                eventlet.sleep(60)
-                self.logger.exception('Ring Master WSGI error')
-
     def start(self):
         """Start up the ring master"""
         self.logger.notice("Ring-Master starting up")
-        if self.serve_ring:
-            self.logger.notice("Spinning up wsgi server")
-            eventlet.spawn_n(self.run_wsgi)
         self.logger.notice("-> Entering ring orchestration loop.")
         while True:
             try:

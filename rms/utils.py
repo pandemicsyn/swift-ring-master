@@ -8,7 +8,7 @@ import sys
 import os
 import atexit
 from signal import SIGTERM
-from time import time
+from time import time, sleep
 
 
 def get_md5sum(filename, chunk_size=4096):
@@ -162,7 +162,7 @@ class Daemon:
         try:
             while 1:
                 os.kill(pid, SIGTERM)
-                time.sleep(0.1)
+                sleep(0.1)
         except OSError, err:
             err = str(err)
             if err.find("No such process") > 0:

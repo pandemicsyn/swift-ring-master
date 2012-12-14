@@ -1,9 +1,11 @@
+import sys
 import eventlet
+import optparse
 from os import stat
 from eventlet import wsgi
 from os.path import exists, join as pathjoin
-from swift.common.utils import split_path, get_logger
-from rms.utils import get_md5sum
+from swift.common.utils import split_path, get_logger, readconf
+from rms.utils import Daemon, get_md5sum
 
 
 class FileIterable(object):
@@ -52,7 +54,7 @@ class RingMasterApp(object):
         self.swiftdir = conf.get('swiftdir', '/etc/swift')
         self.wsgi_port = int(conf.get('serve_ring_port', '8090'))
         self.wsgi_address = conf.get('serve_ring_address', '')
-        self.logger = get_logger(conf, 'ringmaster_wsgi')
+        self.logger = get_logger(conf, 'ringmaster_wsgi', True)
         self.last_tstamp = {}
         self.current_md5 = {}
         for rfile in self.ring_files:
@@ -119,7 +121,56 @@ class RingMasterApp(object):
             start_response('404 Not Found', [('Content-Type', 'text/plain')])
             return ['Not Found\r\n']
 
-    def run(self):
+    def start(self):
         """fire up the app"""
-        wsgi.server(eventlet.listen((self.wsgi_address, self.wsgi_port)),
+        wsgi.server(eventlet.listen((self.wsgi_address,
+                                     self.wsgi_port)),
                     self.handle_request, log=self.request_logger)
+
+
+class RingMasterAppd(Daemon):
+
+    def run(self, conf):
+        rma = RingMasterApp(conf)
+        rma.start()
+
+
+def run_server():
+    usage = '''
+    %prog start|stop|restart [--conf=/path/to/some.conf] [--foreground|-f]
+    '''
+    args = optparse.OptionParser(usage)
+    args.add_option('--foreground', '-f', action="store_true",
+                    help="Run in foreground, in debug mode")
+    args.add_option('--conf', default="/etc/swift/ring-master.conf",
+                    help="path to config. default /etc/swift/ring-master.conf")
+    options, arguments = args.parse_args()
+
+    if len(sys.argv) <= 1:
+        args.print_help()
+
+    if options.foreground:
+        conf = readconf(options.conf)
+        rma = RingMasterApp(conf['ringmaster_wsgi'])
+        rma.start()
+        sys.exit(0)
+
+    if len(sys.argv) >= 2:
+        daemon = RingMasterAppd('/tmp/rmad.pid')
+        if 'start' == sys.argv[1]:
+            conf = readconf(options.conf)
+            daemon.start(conf['ringmaster_wsgi'])
+        elif 'stop' == sys.argv[1]:
+            daemon.stop()
+        elif 'restart' == sys.argv[1]:
+            daemon.restart()
+        else:
+            args.print_help()
+            sys.exit(2)
+        sys.exit(0)
+    else:
+        args.print_help()
+        sys.exit(2)
+
+if __name__ == '__main__':
+    run_server()

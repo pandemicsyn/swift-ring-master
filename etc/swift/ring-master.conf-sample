@@ -47,11 +47,7 @@ log_facility = LOG_LOCAL0
 [ringmaster_wsgi]
 #standard swift logger settings
 log_facility = LOG_LOCAL0
-
 #swiftdir = /etc/swift
-# Whether the ring master wsgi app should be spun up to serve up copies of
-# the rings.
-#enabled = false
 # Listen on this port
 #serve_ring_port = 8090
 # Bind to this address (or empty for all)
