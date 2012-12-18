@@ -78,6 +78,7 @@ class RingMasterApp(object):
         """Validate md5 of file"""
         if self._changed(filename):
             self.logger.debug("updating md5")
+            self.last_tstamp[filename] = stat(filename).st_mtime
             self.current_md5[filename] = get_md5sum(filename)
 
     def handle_ring(self, env, start_response):
