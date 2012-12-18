@@ -204,7 +204,7 @@ class RingMasterServer(object):
     def min_modify_time(self, btype):
         """Check if minimum modify time has passed
 
-        :param builder: builder to check
+        :param btype: builder to check one of account|container|object
         :returns: True if min modify time has elapsed
         """
         since_modified = time() - stat(self.builder_files[btype]).st_mtime
