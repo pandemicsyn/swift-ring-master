@@ -1,4 +1,4 @@
-swift-ring-master
+swift-ring-master - [![Build Status](https://travis-ci.org/pandemicsyn/swift-ring-master.png?branch=master)](https://travis-ci.org/pandemicsyn/swift-ring-master)
 =================
 
 The swift-ring-master-server is a simple daemon that automates ring and ring
