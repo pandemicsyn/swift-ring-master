@@ -51,7 +51,7 @@ class RingMasterServer(object):
         self.mph_enabled = conf.get('min_part_hours_check', 'n') in TRUE_VALUES
         self.sec_since_modified = int(conf.get('min_seconds_since_change',
                                                '10'))
-        self.balance_threshold = int(conf.get('balance_threshold', '2'))
+        self.balance_threshold = float(conf.get('balance_threshold', '2'))
         self.dispersion_pct = {'container': float(conf.get('container_min_pct',
                                                            '99.50')),
                                'object': float(conf.get('object_min_pct',
@@ -109,6 +109,8 @@ class RingMasterServer(object):
         :param builder: builder to adjust
         """
         for dev in builder.devs:
+            if not dev:
+                continue
             if 'target_weight' in dev:
                 if dev['weight'] == dev['target_weight']:
                     continue
