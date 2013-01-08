@@ -14,10 +14,10 @@ Requirements
 
 ## Testing ring orchestration
 
-1. On a working system with the main swift services running start the swift-ring-master-server in a shell. It should report that there
-    are no required changes:
+On a working system with the main swift services running start the swift-ring-master-server in a shell. It should report that there
+are no required changes:
 
-   fhines@ubuntu:~/ring-master (master)$ ./bin/swift-ring-master-server -f /etc/swift/ring-master.conf  
+    fhines@ubuntu:~/ring-master (master)$ ./bin/swift-ring-master-server -f /etc/swift/ring-master.conf  
     ringmasterd Ring-Master starting up
     ringmasterd -> Entering ring orchestration loop.
     ringmasterd ===============================================================================
@@ -33,16 +33,16 @@ Requirements
     ringmasterd ===============================================================================
     ringmasterd [container] -> No ring change required
 
-2. Adjust the target weight of a device in your ring, for example. If all of your devices currently have a weight of 100 try changing one to 80:
+Adjust the target weight of a device in your ring, for example. If all of your devices currently have a weight of 100 try changing one to 80:
 
-    from swift.common.ring import RingBuilder
+    ```from swift.common.ring import RingBuilder
     import cPickle as pickle
     builder = RingBuilder.load('/etc/swift/object.builder')
     builder.devs[0]['target_weight'] = 80.0 # this is the magic number
     builder._last_part_moves_epoch = builder._last_part_moves_epoch - 86400
-    pickle.dump(builder.to_dict(), open('/etc/swift/object.builder', 'wb'), protocol=2)
+    pickle.dump(builder.to_dict(), open('/etc/swift/object.builder', 'wb'), protocol=2)```
 
-3. If you start swift-ring-master-server back up (or if you kept it running) you should now see it adjust the ring for you:
+If you start swift-ring-master-server back up (or if you kept it running) you should now see it adjust the ring for you:
 
     fhines@ubuntu:~/ring-master (master)$ ./bin/swift-ring-master-server -f /etc/swift/ring-master.conf 
     ringmasterd Ring-Master starting up
@@ -81,7 +81,7 @@ Requirements
 
 If you have replication turned on in your SAIO and continue to run swift-ring-master-server you'll see it rebalance/decrease the weight and update the rings until the device matches its target weight.
 
-4. The wsgi app/server just has a single end point of /ring/<ringtype>.tar.gz and supports only a HEAD or GET to that resource (but does support use of a If-None-Match header):
+The wsgi app/server just has a single end point of /ring/<ringtype>.tar.gz and supports only a HEAD or GET to that resource (but does support use of a If-None-Match header):
 
     fhines@kira:~$ http HEAD http://swiftvm.ronin.io:8090/ring/object.ring.gz
     HTTP/1.1 200 OK
@@ -96,7 +96,7 @@ If you have replication turned on in your SAIO and continue to run swift-ring-ma
     Content-Type: application/octet-stream
     Date: Tue, 08 Jan 2013 07:34:00 GMT
 
-5. The included swift-ring-minion-server is a simple client that can utilize the swift-ring-master-wsgi app, it can run in either daemon mode or just once via the --once flag. It simply checks the md5sum of the local current copies of its rings and then compares them with what the swift-ring-master-wsgi app reports. If an md5sum differs the client will retrieve the update ring:
+The included swift-ring-minion-server is a simple client that can utilize the swift-ring-master-wsgi app, it can run in either daemon mode or just once via the --once flag. It simply checks the md5sum of the local current copies of its rings and then compares them with what the swift-ring-master-wsgi app reports. If an md5sum differs the client will retrieve the update ring:
 
     fhines@ubuntu:~/ring-master (master)$ ./bin/swift-ring-minion-server -f /etc/swift/ring-minion.conf --once
     account ring remains unchanged
