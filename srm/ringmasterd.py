@@ -3,23 +3,17 @@ Ring Master Daemon and Middleware for ring orchestration
 """
 
 import sys
-import eventlet
 import optparse
 import subprocess
 import cPickle as pickle
-from time import time
-from datetime import datetime
-from rms.utils import get_md5sum, make_backup, Daemon, is_valid_ring
-from os import stat, unlink, rename, close, fdopen
+from time import time, sleep
 from tempfile import mkstemp
-from swift.common.ring import RingBuilder, Ring
-from swift.common.utils import get_logger, readconf, TRUE_VALUES
+from datetime import datetime
+from os import stat, unlink, rename, close, fdopen
 from swift.common import exceptions
-
-try:
-    import simplejson as json
-except ImportError:
-    import json
+from swift.common.ring import RingBuilder, Ring
+from swift.common.utils import get_logger, readconf, TRUE_VALUES, json
+from srm.utils import get_md5sum, make_backup, Daemon, is_valid_ring
 
 
 class RingMasterServer(object):
@@ -56,24 +50,9 @@ class RingMasterServer(object):
                                                            '99.50')),
                                'object': float(conf.get('object_min_pct',
                                                         '99.50'))}
+        if self.debug:
+            conf['log_level'] = 'DEBUG'
         self.logger = get_logger(conf, 'ringmasterd', self.debug)
-
-    def get_ring_hosts(self, zone_filter, swift_dir, ring_name):
-        """
-        Get a list of hosts in the ring
-
-        :param zone_filter: Only list zones matching given filter
-        :param swift_dir: Directory of swift config, usually /etc/swift
-        :param ring_name: Name of the ring, such as 'object'
-        :returns: a set of tuples containing the ip and port of hosts
-        """
-        ring_data = Ring(swift_dir, ring_name=ring_name)
-        if zone_filter:
-            ips = set((n['ip'], n['port']) for n in ring_data.devs if n
-                      if n['zone'] == zone_filter)
-        else:
-            ips = set((n['ip'], n['port']) for n in ring_data.devs if n)
-        return ips
 
     def rebalance_ring(self, builder):
         """Rebalance a ring
@@ -84,9 +63,7 @@ class RingMasterServer(object):
         devs_changed = builder.devs_changed
         try:
             last_balance = builder.get_balance()
-            eventlet.sleep()
             parts, balance = builder.rebalance()
-            eventlet.sleep()
         except exceptions.RingBuilderError:
             self.logger.error("-> Rebalance failed!")
             self.logger.exception('RingBuilderError')
@@ -121,11 +98,10 @@ class RingMasterServer(object):
                             dev['id'], dev['weight'] + self.weight_shift)
                     else:
                         builder.set_dev_weight(dev['id'], dev['target_weight'])
-                    if self.debug:
-                        self.logger.notice(
-                            "--> [%s/%s] ++ weight to %s" % (dev['ip'],
-                                                             dev['device'],
-                                                             dev['weight']))
+                    self.logger.debug(
+                        "--> [%s/%s] ++ weight to %s" % (dev['ip'],
+                                                         dev['device'],
+                                                         dev['weight']))
                 elif dev['weight'] > dev['target_weight']:
                     if dev['weight'] - self.weight_shift \
                             > dev['target_weight']:
@@ -133,11 +109,10 @@ class RingMasterServer(object):
                             dev['id'], dev['weight'] - self.weight_shift)
                     else:
                         builder.set_dev_weight(dev['id'], dev['target_weight'])
-                    if self.debug:
-                        self.logger.notice(
-                            "--> [%s/%s] -- weight to %s" % (dev['ip'],
-                                                             dev['device'],
-                                                             dev['weight']))
+                    self.logger.debug(
+                        "--> [%s/%s] -- weight to %s" % (dev['ip'],
+                                                         dev['device'],
+                                                         dev['weight']))
 
     def ring_requires_change(self, builder):
         """Check if a ring requires changes
@@ -149,12 +124,11 @@ class RingMasterServer(object):
         for dev in builder.devs:
             if 'target_weight' in dev:
                 if dev['weight'] != dev['target_weight']:
-                    if self.debug:
-                        self.logger.notice("--> [%s] weight %s | target %s"
-                                           % (
-                                           dev['ip'] + '/' +
-                                           dev['device'], dev['weight'],
-                                           dev['target_weight']))
+                    self.logger.debug("--> [%s] weight %s | target %s"
+                                      % (
+                                      dev['ip'] + '/' +
+                                      dev['device'], dev['weight'],
+                                      dev['target_weight']))
                     change = True
         return change
 
@@ -166,8 +140,7 @@ class RingMasterServer(object):
         """
         if swift_type == 'account':
             return True
-        if self.debug:
-            self.logger.notice("--> Running %s dispersion report" % swift_type)
+        self.logger.debug("--> Running %s dispersion report" % swift_type)
         dsp_cmd = ['swift-dispersion-report', '-j', '--%s-only' % swift_type]
         try:
             result = json.loads(subprocess.Popen(dsp_cmd,
@@ -178,8 +151,7 @@ class RingMasterServer(object):
         if not result[swift_type]:
             self.logger.notice("--> Dispersion report run returned nothing!")
             return False
-        if self.debug:
-            self.logger.notice("--> Dispersion info: %s" % result)
+        self.logger.debug("--> Dispersion info: %s" % result)
         if result[swift_type]['missing_2'] == 0 and \
                 result[swift_type]['pct_found'] > \
                 self.dispersion_pct[swift_type]:
@@ -194,10 +166,9 @@ class RingMasterServer(object):
         :returns: True if min part hours have elapsed
         """
         elapsed_hours = int(time() - builder._last_part_moves_epoch) / 3600
-        if self.debug:
-            self.logger.notice('--> partitions last moved %d hours ago [%s]'
-                               % (elapsed_hours, datetime.utcfromtimestamp(
-                                   builder._last_part_moves_epoch)))
+        self.logger.debug('--> partitions last moved %d hours ago [%s]'
+                          % (elapsed_hours, datetime.utcfromtimestamp(
+                             builder._last_part_moves_epoch)))
         if elapsed_hours > builder.min_part_hours:
             return True
         else:
@@ -210,9 +181,8 @@ class RingMasterServer(object):
         :returns: True if min modify time has elapsed
         """
         since_modified = time() - stat(self.builder_files[btype]).st_mtime
-        if self.debug:
-            self.logger.notice(
-                '--> Ring last modified %d seconds ago.' % since_modified)
+        self.logger.debug(
+            '--> Ring last modified %d seconds ago.' % since_modified)
         if since_modified > self.sec_since_modified:
             return True
         else:
@@ -224,13 +194,9 @@ class RingMasterServer(object):
         :param builder: builder to check
         :returns: True ring balance is ok
         """
-        if self.debug:
-            self.logger.notice(
-                '--> Current balance: %.02f' % builder.get_balance())
-        if builder.get_balance() > self.balance_threshold:
-            return False
-        else:
-            return True
+        self.logger.debug(
+            '--> Current balance: %.02f' % builder.get_balance())
+        return builder.get_balance() <= self.balance_threshold
 
     def write_builder(self, btype, builder):
         """Write out new ring files
@@ -240,12 +206,21 @@ class RingMasterServer(object):
         :returns: new ring file md5
         """
         builder_file = self.builder_files[btype]
-        backup, backup_md5 = make_backup(builder_file, self.backup_dir)
-        self.logger.notice(
-            '--> Backed up %s to %s (%s)' % (builder_file, backup, backup_md5))
-        fd, tmppath = mkstemp(dir=self.swiftdir, suffix='.tmp.builder')
-        pickle.dump(builder.to_dict(), fdopen(fd, 'wb'), protocol=2)
-        rename(tmppath, builder_file)
+        try:
+            fd, tmppath = mkstemp(dir=self.swiftdir, suffix='.tmp.builder')
+            pickle.dump(builder.to_dict(), fdopen(fd, 'wb'), protocol=2)
+            backup, backup_md5 = make_backup(builder_file, self.backup_dir)
+            self.logger.notice('--> Backed up %s to %s (%s)' % \
+                    (builder_file, backup, backup_md5))
+            rename(tmppath, builder_file)
+            close(fd)
+        except Exception as err:
+            if fd:
+                try:
+                    close(fd)
+                except OSError:
+                    pass
+            raise Exception('Error writing builder: %s' % err)
         return get_md5sum(builder_file)
 
     def write_ring(self, btype, builder):
@@ -256,26 +231,28 @@ class RingMasterServer(object):
         :returns: new ring file md5
         """
         ring_file = self.ring_files[btype]
-        backup, backup_md5 = make_backup(ring_file, self.backup_dir)
-        self.logger.notice('--> Backed up %s to %s (%s)' % (ring_file, backup,
-                                                            backup_md5))
         fd, tmppath = mkstemp(dir=self.swiftdir, suffix='.tmp.ring.gz')
         builder.get_ring().save(tmppath)
         close(fd)
         if not is_valid_ring(tmppath):
             unlink(tmppath)
             raise Exception('Ring Validate Failed')
-        rename(tmppath, ring_file)
+        try:
+            backup, backup_md5 = make_backup(ring_file, self.backup_dir)
+            self.logger.notice('--> Backed up %s to %s (%s)' % \
+                    (ring_file, backup, backup_md5))
+            rename(tmppath, ring_file)
+        except:
+            unlink(tmppath)
         return get_md5sum(ring_file)
 
     def orchestration_pass(self):
         """Check the rings, make any needed adjustments, and deploy the ring"""
         ring_changed = False
         for btype in self.builder_files:
-            if self.debug:
-                self.logger.notice("=" * 79)
+            self.logger.debug("=" * 79)
             self.logger.notice("Checking on %s ring..." % btype)
-            self.logger.notice("=" * 79)
+            self.logger.debug("=" * 79)
             builder = RingBuilder.load(self.builder_files[btype])
             if self.ring_requires_change(builder):
                 self.logger.notice(
@@ -315,7 +292,7 @@ class RingMasterServer(object):
                     if not rebalanced:
                         self.logger.notice(
                             "[%s] -> Rebalance: not ready!" % btype)
-                        ring_changed = True # we should sleep a bit longer
+                        ring_changed = True  # we should sleep a bit longer
                         continue
                     else:
                         self.logger.notice("[%s] -> Rebalance: ok" % btype)
@@ -328,7 +305,7 @@ class RingMasterServer(object):
                     if not rebalanced:
                         self.logger.notice(
                             "[%s] -> Rebalance: not ready!" % btype)
-                        ring_changed = True # we should sleep a bit longer
+                        ring_changed = True  # we should sleep a bit longer
                         continue
                     else:
                         self.logger.notice("[%s] -> Rebalance: ok" % btype)
@@ -348,9 +325,9 @@ class RingMasterServer(object):
                 self.logger.notice("[%s] -> No ring change required" % btype)
                 continue
         if ring_changed:
-            eventlet.sleep(self.recheck_after_change_interval)
+            sleep(self.recheck_after_change_interval)
         else:
-            eventlet.sleep(self.recheck_interval)
+            sleep(self.recheck_interval)
 
     def start(self):
         """Start up the ring master"""
@@ -362,7 +339,7 @@ class RingMasterServer(object):
             except Exception:
                 self.logger.exception('Orchestration Error')
                 raise
-            eventlet.sleep(1)
+            sleep(1)
 
 
 class RingMasterd(Daemon):

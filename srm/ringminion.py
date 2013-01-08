@@ -1,13 +1,13 @@
 import os
 import sys
-import eventlet
 import optparse
 from random import choice
-from eventlet.green import urllib2
 from tempfile import mkstemp
 from os.path import basename, dirname, join as pathjoin, exists
-from rms.utils import Daemon, get_md5sum, is_valid_ring
+import eventlet
+from eventlet.green import urllib2
 from swift.common.utils import get_logger, readconf, TRUE_VALUES
+from srm.utils import Daemon, get_md5sum, is_valid_ring
 
 
 class RingMinion(object):
@@ -18,17 +18,22 @@ class RingMinion(object):
         # self.swiftdir = '/etc/swift-test'
         self.swiftdir = conf.get('swiftdir', '/etc/swift')
         self.rings = {'account': conf.get('account_ring',
-                                          '/etc/swift/account.ring.gz'),
+                                          pathjoin(self.swiftdir,
+                                                   'account.ring.gz')),
                       'container': conf.get('container_ring',
-                                            '/etc/swift/container.ring.gz'),
+                                            pathjoin(self.swiftdir,
+                                                     'container.ring.gz')),
                       'object': conf.get('object_ring',
-                                         '/etc/swift/object.ring.gz')}
+                                         pathjoin(self.swiftdir,
+                                                  'object.ring.gz'))}
         self.start_delay = int(conf.get('start_delay_range', '120'))
         self.check_interval = int(conf.get('check_interval', '30'))
         self.ring_master = conf.get('ring_master', 'http://127.0.0.1:8090/')
         self.ring_master_timeout = int(conf.get('ring_master_timeout', '300'))
         self.debug = conf.get('debug', 'n') in TRUE_VALUES
-        self.logger = get_logger(conf, 'ringminiond')
+        if self.debug:
+            conf['log_level'] = 'DEBUG'
+        self.logger = get_logger(conf, 'ringminiond', self.debug)
         for ring in self.rings:
             if exists(self.rings[ring]):
                 self.current_md5[self.rings[ring]] = \

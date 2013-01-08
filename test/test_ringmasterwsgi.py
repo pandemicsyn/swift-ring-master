@@ -1,14 +1,14 @@
-from mock import patch, Mock, MagicMock, sentinel, call
-import unittest
-from tempfile import mkdtemp
-import cPickle as pickle
-from swift.common.ring import RingBuilder
-import time
 import os
+import time
+import unittest
+import cPickle as pickle
 from shutil import rmtree
-from rms.ringmasterwsgi import RingMasterApp
-from rms.utils import get_md5sum
+from tempfile import mkdtemp
+from mock import MagicMock
 from swift.common.swob import Request
+from swift.common.ring import RingBuilder
+from srm.ringmasterwsgi import RingMasterApp
+from srm.utils import get_md5sum
 
 
 class FakeApp(object):

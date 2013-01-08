@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from rms.ringmasterd import run_server
+from srm.ringmasterd import run_server
 
 if __name__ == '__main__':
         run_server()

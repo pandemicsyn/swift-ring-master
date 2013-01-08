@@ -1,11 +1,10 @@
 import sys
-import eventlet
 import optparse
 from os import stat
-from eventlet import wsgi
 from os.path import exists, join as pathjoin
+from eventlet import wsgi, listen
 from swift.common.utils import split_path, get_logger, readconf
-from rms.utils import Daemon, get_md5sum
+from srm.utils import Daemon, get_md5sum
 
 
 class FileIterable(object):
@@ -124,8 +123,7 @@ class RingMasterApp(object):
 
     def start(self):
         """fire up the app"""
-        wsgi.server(eventlet.listen((self.wsgi_address,
-                                     self.wsgi_port)),
+        wsgi.server(listen((self.wsgi_address, self.wsgi_port)),
                     self.handle_request, log=self.request_logger)
 
 

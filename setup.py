@@ -1,5 +1,5 @@
 from setuptools import setup, find_packages
-from rms import __version__ as version
+from srm import __version__ as version
 
 install_requires = []
 try:

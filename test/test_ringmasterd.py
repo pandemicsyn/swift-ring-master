@@ -1,15 +1,15 @@
-from mock import patch, Mock, MagicMock, sentinel, call
-import unittest
-from tempfile import mkdtemp
-import cPickle as pickle
-from swift.common.ring import RingBuilder
-import time
 import os
-from shutil import rmtree
-from rms.ringmasterd import RingMasterServer
-from rms.utils import get_md5sum
-import subprocess  # topatch
+import time
+import subprocess  # to patch
 import json
+import unittest
+import cPickle as pickle
+from shutil import rmtree
+from tempfile import mkdtemp
+from swift.common.ring import RingBuilder
+from mock import patch, Mock, MagicMock, call
+from srm.ringmasterd import RingMasterServer
+
 
 class FakedBuilder(object):
 
@@ -138,7 +138,7 @@ class test_ringmasterserver(unittest.TestCase):
         # test container and object ok
         self.assertTrue(rmd.dispersion_ok('container'))
         self.assertTrue(rmd.dispersion_ok('object'))
-        self.assertEquals(rmd.logger.notice.call_count, 4)
+        self.assertEquals(rmd.logger.debug.call_count, 4)
         self.assertEquals(rmd.logger.exception.call_count, 0)
         rmd.logger.reset_mock()
         # test that container and obj fail on missing 2 replicas
@@ -148,7 +148,7 @@ class test_ringmasterserver(unittest.TestCase):
         popen.return_value.communicate.return_value = [json.dumps(dsp_rpt_missing)]
         self.assertFalse(rmd.dispersion_ok('container'))
         self.assertFalse(rmd.dispersion_ok('object'))
-        self.assertEquals(rmd.logger.notice.call_count, 4)
+        self.assertEquals(rmd.logger.debug.call_count, 4)
         self.assertEquals(rmd.logger.exception.call_count, 0)
         rmd.logger.reset_mock()
         # test that container and obj fail on missing large pct
@@ -158,14 +158,14 @@ class test_ringmasterserver(unittest.TestCase):
         popen.return_value.communicate.return_value = [json.dumps(dsp_rpt_pct)]
         self.assertFalse(rmd.dispersion_ok('container'))
         self.assertFalse(rmd.dispersion_ok('object'))
-        self.assertEquals(rmd.logger.notice.call_count, 4)
+        self.assertEquals(rmd.logger.debug.call_count, 4)
         self.assertEquals(rmd.logger.exception.call_count, 0)
         rmd.logger.reset_mock()
         # test catch exception
         popen.return_value.communicate.return_value = ''
         self.assertFalse(rmd.dispersion_ok('container'))
         self.assertFalse(rmd.dispersion_ok('object'))
-        self.assertEquals(rmd.logger.notice.call_count, 2)
+        self.assertEquals(rmd.logger.debug.call_count, 2)
         self.assertEquals(rmd.logger.exception.call_count, 2)
         rmd.logger.reset_mock()
         # test no output
@@ -173,7 +173,7 @@ class test_ringmasterserver(unittest.TestCase):
                                                                    'object': {}})]
         self.assertFalse(rmd.dispersion_ok('container'))
         self.assertFalse(rmd.dispersion_ok('object'))
-        self.assertEquals(rmd.logger.notice.call_count, 4)
+        self.assertEquals(rmd.logger.debug.call_count, 2)
         self.assertEquals(rmd.logger.exception.call_count, 0)
         rmd.logger.reset_mock()
 
@@ -202,9 +202,48 @@ class test_ringmasterserver(unittest.TestCase):
         builder.get_balance.return_value = bad_balance
         self.assertFalse(rmd.ring_balance_ok(builder))
 
-    @patch('eventlet.sleep')
-    def test_orchestration_pass(self, evs):
-        evs.return_value = Mock()
+    def test_min_part_hours_ok(self):
+        fb = FakedBuilder(device_count=4)
+        builder = fb.gen_builder(balanced=False)
+        builder._last_part_moves_epoch = int(time.time())
+        rmd = RingMasterServer(rms_conf={'ringmasterd': self.confdict})
+        rmd.logger = MagicMock()
+        self.assertFalse(rmd.min_part_hours_ok(builder))
+        builder._last_part_moves_epoch = int(time.time()) - 424242
+        self.assertTrue(rmd.min_part_hours_ok(builder))
+
+    #fixme - wtf am i doing here
+    @patch('srm.ringmasterd.rename')
+    @patch('srm.ringmasterd.mkstemp')
+    @patch('srm.ringmasterd.make_backup')
+    @patch('srm.ringmasterd.get_md5sum')
+    @patch('srm.ringmasterd.pickle.dump')
+    @patch('srm.ringmasterd.close')
+    def test_write_builder2(self, fdclose, pd, gmd5, mbackup, ftmp, frename):
+        frename.return_value = True
+        ftmp.return_value = [1, '/fake/path/a.file']
+        mbackup.return_value = ['testit', 'somemd5']
+        gmd5.return_value = True
+        pd.return_value = Mock()
+        fdclose.return_value = Mock()
+        fb = FakedBuilder(device_count=4)
+        builder = fb.gen_builder(balanced=False)
+        rmd = RingMasterServer(rms_conf={'ringmasterd': self.confdict})
+        rmd.swiftdir = os.path.realpath('.')
+        rmd.logger = MagicMock()
+        self.assertTrue(rmd.write_builder('object', builder))
+        self.assertEquals(ftmp.mock_calls, [call(suffix='.tmp.builder', dir=os.path.realpath('.'))])
+        fake_builder_path = os.path.join(self.testdir, 'object.builder')
+        fake_builder_bdir = os.path.join(self.testdir, 'backup')
+        self.assertEquals(mbackup.mock_calls, [call(fake_builder_path, fake_builder_bdir)])
+        self.assertEquals(fdclose.mock_calls, [call(1)])
+        ftmp.return_value = [2, '/fake/path/a.file']
+        mbackup.side_effect = Exception('OMGMONKEY!')
+        self.assertRaises(Exception, rmd.write_builder, ['something', 'else'])
+
+    @patch('srm.ringmasterd.sleep')
+    def test_orchestration_pass(self, srs):
+        srs.return_value = Mock()
         self._setup_builder_rings(count=4, balanced=False)
         rmd = RingMasterServer(rms_conf={'ringmasterd': self.confdict})
         rmd.logger = MagicMock()
@@ -226,7 +265,7 @@ class test_ringmasterserver(unittest.TestCase):
             rmd.rebalance_ring.reset_mock()
             rmd.write_builder.reset_mock()
             rmd.write_ring.reset_mock()
-            evs.reset_mock()
+            srs.reset_mock()
 
         #passes with no changes
         rmd.ring_requires_change.return_value = False
@@ -238,7 +277,7 @@ class test_ringmasterserver(unittest.TestCase):
         self.assertFalse(rmd.rebalance_ring.called)
         self.assertFalse(rmd.write_builder.called)
         self.assertFalse(rmd.write_ring.called)
-        self.assertEquals(evs.mock_calls, [call(rmd.recheck_interval)])
+        self.assertEquals(srs.mock_calls, [call(rmd.recheck_interval)])
         _reset_all()
 
         #change required, with min_part_hours enabled and everything ready
@@ -252,7 +291,7 @@ class test_ringmasterserver(unittest.TestCase):
         self.assertTrue(rmd.rebalance_ring.called)
         self.assertTrue(rmd.write_builder.called)
         self.assertTrue(rmd.write_ring.called)
-        self.assertEquals(evs.mock_calls,
+        self.assertEquals(srs.mock_calls,
                           [call(rmd.recheck_after_change_interval)])
         _reset_all()
 
@@ -268,7 +307,7 @@ class test_ringmasterserver(unittest.TestCase):
         self.assertFalse(rmd.rebalance_ring.called)
         self.assertFalse(rmd.write_builder.called)
         self.assertFalse(rmd.write_ring.called)
-        self.assertEquals(evs.mock_calls, [call(rmd.recheck_interval)])
+        self.assertEquals(srs.mock_calls, [call(rmd.recheck_interval)])
         rmd.min_part_hours_ok.return_value = True
         _reset_all()
 
@@ -284,7 +323,7 @@ class test_ringmasterserver(unittest.TestCase):
         self.assertFalse(rmd.rebalance_ring.called)
         self.assertFalse(rmd.write_builder.called)
         self.assertFalse(rmd.write_ring.called)
-        self.assertEquals(evs.mock_calls, [call(rmd.recheck_interval)])
+        self.assertEquals(srs.mock_calls, [call(rmd.recheck_interval)])
         rmd.min_modify_time.return_value = True
         _reset_all()
 
@@ -300,7 +339,7 @@ class test_ringmasterserver(unittest.TestCase):
         self.assertFalse(rmd.rebalance_ring.called)
         self.assertFalse(rmd.write_builder.called)
         self.assertFalse(rmd.write_ring.called)
-        self.assertEquals(evs.mock_calls, [call(rmd.recheck_interval)])
+        self.assertEquals(srs.mock_calls, [call(rmd.recheck_interval)])
         rmd.dispersion_ok.return_value = True
         _reset_all()
 
@@ -316,7 +355,7 @@ class test_ringmasterserver(unittest.TestCase):
         self.assertTrue(rmd.rebalance_ring.called)
         self.assertTrue(rmd.write_builder.called)
         self.assertTrue(rmd.write_ring.called)
-        self.assertEquals(evs.mock_calls,
+        self.assertEquals(srs.mock_calls,
                           [call(rmd.recheck_after_change_interval)])
         rmd.ring_balance_ok.return_value = True
         _reset_all()

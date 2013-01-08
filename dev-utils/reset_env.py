@@ -1,8 +1,7 @@
 from swift.common.ring import RingBuilder
 from eventlet import sleep
 import cPickle as pickle
-from rms import ringmasterd
-
+from srm import ringmasterd
 
 def modring():
     builder = RingBuilder.load('/etc/swift/object.builder')
