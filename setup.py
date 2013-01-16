@@ -9,6 +9,11 @@ except ImportError:
 
 name = "swift-ring-master"
 
+data_files = [('share/swift-ring-master',
+               ['README.md',
+                'etc/swift/ring-master.conf-sample',
+                'etc/swift/ring-minion.conf-sample'])]
+
 setup(
     name = name,
     version = version,
@@ -29,5 +34,5 @@ setup(
     install_requires=install_requires,
     scripts=['bin/swift-ring-master-server',
              'bin/swift-ring-master-wsgi-server',
-             'bin/swift-ring-minion-server']
-    )
+             'bin/swift-ring-minion-server'],
+    data_files = data_files)
