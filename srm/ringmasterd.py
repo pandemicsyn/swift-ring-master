@@ -122,6 +122,8 @@ class RingMasterServer(object):
         """
         change = False
         for dev in builder.devs:
+            if not dev:
+                continue
             if 'target_weight' in dev:
                 if dev['weight'] != dev['target_weight']:
                     self.logger.debug("--> [%s] weight %s | target %s"
