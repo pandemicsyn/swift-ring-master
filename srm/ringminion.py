@@ -75,6 +75,7 @@ class RingMinion(object):
                         fdo.write(chunk)
                     fdo.flush()
                     os.fsync(fdo)
+                    os.fchmod(fdo, 0644)
                     if self.md5matches(tmppath, expected_md5):
                         if not is_valid_ring(tmppath):
                             os.unlink(tmppath)

@@ -9,7 +9,7 @@ import cPickle as pickle
 from time import time, sleep
 from tempfile import mkstemp
 from datetime import datetime
-from os import stat, unlink, rename, close, fdopen
+from os import stat, unlink, rename, close, fdopen, fchmod
 from swift.common import exceptions
 from swift.common.ring import RingBuilder, Ring
 from swift.common.utils import get_logger, readconf, TRUE_VALUES, json
@@ -214,6 +214,7 @@ class RingMasterServer(object):
             backup, backup_md5 = make_backup(builder_file, self.backup_dir)
             self.logger.notice('--> Backed up %s to %s (%s)' % \
                     (builder_file, backup, backup_md5))
+            fchmod(fd, 0644)
             rename(tmppath, builder_file)
             try:
                 close(fd)
@@ -238,6 +239,7 @@ class RingMasterServer(object):
         ring_file = self.ring_files[btype]
         fd, tmppath = mkstemp(dir=self.swiftdir, suffix='.tmp.ring.gz')
         builder.get_ring().save(tmppath)
+        fchmod(fd, 0644)
         close(fd)
         if not is_valid_ring(tmppath):
             unlink(tmppath)
