@@ -213,13 +213,15 @@ class test_ringmasterserver(unittest.TestCase):
         self.assertTrue(rmd.min_part_hours_ok(builder))
 
     #fixme - wtf am i doing here
+    @patch('srm.ringmasterd.chmod')
     @patch('srm.ringmasterd.rename')
     @patch('srm.ringmasterd.mkstemp')
     @patch('srm.ringmasterd.make_backup')
     @patch('srm.ringmasterd.get_md5sum')
     @patch('srm.ringmasterd.pickle.dump')
     @patch('srm.ringmasterd.close')
-    def test_write_builder2(self, fdclose, pd, gmd5, mbackup, ftmp, frename):
+    def test_write_builder2(self, fdclose, pd, gmd5, mbackup, ftmp, frename, fc):
+        fc.return_value = True
         frename.return_value = True
         ftmp.return_value = [1, '/fake/path/a.file']
         mbackup.return_value = ['testit', 'somemd5']
