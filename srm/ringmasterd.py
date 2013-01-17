@@ -215,7 +215,10 @@ class RingMasterServer(object):
             self.logger.notice('--> Backed up %s to %s (%s)' % \
                     (builder_file, backup, backup_md5))
             rename(tmppath, builder_file)
-            close(fd)
+            try:
+                close(fd)
+            except OSError:
+                pass
         except Exception as err:
             if fd:
                 try:

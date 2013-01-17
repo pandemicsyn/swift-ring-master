@@ -14,8 +14,6 @@ class RingMinion(object):
 
     def __init__(self, conf):
         self.current_md5 = {}
-        # self.rings = {'test': 'test.ring.gz'}
-        # self.swiftdir = '/etc/swift-test'
         self.swiftdir = conf.get('swiftdir', '/etc/swift')
         self.rings = {'account': conf.get('account_ring',
                                           pathjoin(self.swiftdir,
@@ -105,16 +103,16 @@ class RingMinion(object):
             return False
 
     def watch_loop(self):
+        # insert a random delay on startup so we don't flood the server
+        eventlet.sleep(choice(range(self.start_delay)))
         while True:
-            # insert a random delay on startup so we don't flood the server
-            eventlet.sleep(choice(range(self.start_delay)))
             try:
                 for ring in self.rings:
                     changed = self.ring_updated(ring)
                     if changed:
                         self.logger.info("%s ring updated" % ring)
                     elif changed is False:
-                        self.logger.info("%s ring change failed" % ring)
+                        self.logger.info("%s ring check/change failed" % ring)
                     elif changed is None:
                         self.logger.info("%s ring remains unchanged" % ring)
                     eventlet.sleep(self.check_interval)
