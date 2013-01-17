@@ -67,27 +67,33 @@ class RingMinion(object):
                     self.logger.warning("No etag provided by ring-master")
                     return False
                 fd, tmppath = mkstemp(dir=tmp, suffix='.tmp')
-                with os.fdopen(fd, 'wb') as fdo:
-                    while True:
-                        chunk = response.read(4096)
-                        if not chunk:
-                            break
-                        fdo.write(chunk)
-                    fdo.flush()
-                    os.fsync(fdo)
-                    os.fchmod(fdo, 0644)
-                    if self.md5matches(tmppath, expected_md5):
-                        if not is_valid_ring(tmppath):
+                try:
+                    with os.fdopen(fd, 'wb') as fdo:
+                        while True:
+                            chunk = response.read(4096)
+                            if not chunk:
+                                break
+                            fdo.write(chunk)
+                        fdo.flush()
+                        os.fsync(fdo)
+                        if self.md5matches(tmppath, expected_md5):
+                            if not is_valid_ring(tmppath):
+                                os.unlink(tmppath)
+                                self.logger.error('error validating ring')
+                                return False
+                            os.chmod(tmppath, 0644)
+                            os.rename(tmppath, self.rings[ring_type])
+                            self.current_md5[self.rings[ring_type]] = expected_md5
+                            return True
+                        else:
+                            self.logger.warning('md5 missmatch')
                             os.unlink(tmppath)
-                            self.logger.error('error validating ring')
                             return False
-                        os.rename(tmppath, self.rings[ring_type])
-                        self.current_md5[self.rings[ring_type]] = expected_md5
-                        return True
-                    else:
-                        self.logger.warning('md5 missmatch')
+                except:
+                    try:
                         os.unlink(tmppath)
-                        return False
+                    except OSError:
+                        pass
             else:
                 self.logger.warning('Got %s status with body:' % response.code)
                 self.logger.warning(response.read())
