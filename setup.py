@@ -12,7 +12,7 @@ name = "swift-ring-master"
 data_files = [('share/swift-ring-master',
                ['README.md',
                 'etc/swift/ring-master.conf-sample',
-                'etc/swift/ring-minion.conf-sample'])
+                'etc/swift/ring-minion.conf-sample']),
                ('/etc/init.d', ['etc/init.d/swift-ring-minion'])]
 
 setup(
