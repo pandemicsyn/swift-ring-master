@@ -75,12 +75,12 @@ class RingMinion(object):
                         fdo.write(chunk)
                     fdo.flush()
                     os.fsync(fdo)
-                    os.fchmod(fdo, 0644)
                     if self.md5matches(tmppath, expected_md5):
                         if not is_valid_ring(tmppath):
                             os.unlink(tmppath)
                             self.logger.error('error validating ring')
                             return False
+                        os.chmod(tmppath, 0644)
                         os.rename(tmppath, self.rings[ring_type])
                         self.current_md5[self.rings[ring_type]] = expected_md5
                         return True

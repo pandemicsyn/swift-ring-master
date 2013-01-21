@@ -17,7 +17,7 @@ data_files = [('share/swift-ring-master',
 
 setup(
     name = name,
-    version = version,
+    version = version + "-rax2",
     author = "Florian Hines",
     author_email = "syn@ronin.io",
     description = "Manage swift rings",

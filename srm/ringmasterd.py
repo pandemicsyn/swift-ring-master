@@ -120,7 +120,10 @@ class RingMasterServer(object):
         :param builder: builder who's devices to check
         :returns: True if ring requires change
         """
-        change = False
+        if builder.devs_changed:
+            return True
+        if not self.ring_balance_ok(builder):
+            return True
         for dev in builder.devs:
             if not dev:
                 continue
@@ -131,8 +134,8 @@ class RingMasterServer(object):
                                       dev['ip'] + '/' +
                                       dev['device'], dev['weight'],
                                       dev['target_weight']))
-                    change = True
-        return change
+                    return True
+        return False
 
     def dispersion_ok(self, swift_type):
         """Run a dispersion report and check whether its 'ok'
@@ -261,7 +264,7 @@ class RingMasterServer(object):
             self.logger.notice("Checking on %s ring..." % btype)
             self.logger.debug("=" * 79)
             builder = RingBuilder.load(self.builder_files[btype])
-            if self.ring_requires_change(builder):
+            if self.ring_requires_change(builder) or builder.devs_changed:
                 self.logger.notice(
                     "[%s] -> ring requires weight change." % btype)
 
