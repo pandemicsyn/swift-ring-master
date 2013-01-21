@@ -31,6 +31,8 @@ class FakedBuilder(object):
             builder.add_dev({'id': next_dev_id, 'zone': zone, 'ip': ipaddr,
                              'port': int(port), 'device': device_name,
                              'weight': weight, 'meta': meta})
+            #add an empty dev
+            builder.devs.append(None)
             if balanced:
                 builder.rebalance()
         return builder
@@ -69,6 +71,18 @@ class test_ringmasterserver(unittest.TestCase):
             ring_file += '.ring.gz'
             builder.get_ring().save(os.path.join(self.testdir, ring_file))
 
+    @patch('srm.ringmasterd.sleep')
+    @patch('srm.ringmasterd.exists')
+    def test_pause_if_asked(self, fexists, fsleep):
+        fsleep.return_value = True
+        fexists.side_effect = [True, True, False]
+        rmd = RingMasterServer(rms_conf={'ringmasterd': self.confdict})
+        rmd.logger = MagicMock()
+        rmd.pause_if_asked()
+        self.assertEquals(fsleep.call_count, 1)
+        self.assertEquals(fexists.call_count, 3)
+        self.assertEquals(rmd.logger.notice.call_count, 2)
+
     def test_adjust_ring(self):
         fb = FakedBuilder(device_count=4)
         builder = fb.gen_builder(balanced=False)
@@ -102,7 +116,9 @@ class test_ringmasterserver(unittest.TestCase):
     def test_ring_requires_change(self):
         fb = FakedBuilder(device_count=4)
         builder = fb.gen_builder(balanced=False)
+        builder.devs_changed = False
         rmd = RingMasterServer(rms_conf={'ringmasterd': self.confdict})
+        rmd.ring_balance_ok = MagicMock(return_value=True)
         rmd.logger = MagicMock()
         # test no change, with no target_weight
         self.assertFalse(rmd.ring_requires_change(builder))
@@ -111,6 +127,13 @@ class test_ringmasterserver(unittest.TestCase):
         self.assertFalse(rmd.ring_requires_change(builder))
         # test with change
         builder.devs[0]['target_weight'] = 42.0
+        self.assertTrue(rmd.ring_requires_change(builder))
+        # test brand new ring (i.e. newly added devs)
+        builder = fb.gen_builder(balanced=False)
+        self.assertTrue(rmd.ring_requires_change(builder))
+        # test brand new ring bad balance
+        builder.devs_changed = False
+        rmd.ring_balance_ok = MagicMock(return_value=False)
         self.assertTrue(rmd.ring_requires_change(builder))
 
     @patch('subprocess.Popen')
@@ -213,13 +236,16 @@ class test_ringmasterserver(unittest.TestCase):
         self.assertTrue(rmd.min_part_hours_ok(builder))
 
     #fixme - wtf am i doing here
+    @patch('srm.ringmasterd.chmod')
     @patch('srm.ringmasterd.rename')
     @patch('srm.ringmasterd.mkstemp')
     @patch('srm.ringmasterd.make_backup')
     @patch('srm.ringmasterd.get_md5sum')
     @patch('srm.ringmasterd.pickle.dump')
     @patch('srm.ringmasterd.close')
-    def test_write_builder2(self, fdclose, pd, gmd5, mbackup, ftmp, frename):
+    def test_write_builder(self, fdclose, pd, gmd5, mbackup, ftmp, frename,
+                           fake_chmod):
+        fake_chmod.return_value = True
         frename.return_value = True
         ftmp.return_value = [1, '/fake/path/a.file']
         mbackup.return_value = ['testit', 'somemd5']
@@ -228,6 +254,7 @@ class test_ringmasterserver(unittest.TestCase):
         fdclose.return_value = Mock()
         fb = FakedBuilder(device_count=4)
         builder = fb.gen_builder(balanced=False)
+        builder.devs_changed = False
         rmd = RingMasterServer(rms_conf={'ringmasterd': self.confdict})
         rmd.swiftdir = os.path.realpath('.')
         rmd.logger = MagicMock()
