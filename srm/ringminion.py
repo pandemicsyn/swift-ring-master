@@ -167,7 +167,7 @@ def run_server():
         sys.exit(0)
 
     if len(sys.argv) >= 2:
-        daemon = RingMiniond('/tmp/rmcd.pid')
+        daemon = RingMiniond('/var/run/swift/swift-ring-minion-server.pid')
         if 'start' == sys.argv[1]:
             conf = readconf(options.conf)
             daemon.start(conf['minion'])

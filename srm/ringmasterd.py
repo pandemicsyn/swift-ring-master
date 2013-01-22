@@ -404,7 +404,7 @@ def run_server():
         sys.exit(0)
 
     if len(sys.argv) >= 2:
-        daemon = RingMasterd('/tmp/rmsd.pid')
+        daemon = RingMasterd('/var/run/swift/swift-ring-master-server.pid')
         if 'start' == sys.argv[1]:
             conf = readconf(options.conf)
             daemon.start(conf)

@@ -155,7 +155,7 @@ def run_server():
         sys.exit(0)
 
     if len(sys.argv) >= 2:
-        daemon = RingMasterAppd('/tmp/rmad.pid')
+        daemon = RingMasterAppd('/var/run/swift/swift-ring-master-wsgi-server.pid')
         if 'start' == sys.argv[1]:
             conf = readconf(options.conf)
             daemon.start(conf['ringmaster_wsgi'])
