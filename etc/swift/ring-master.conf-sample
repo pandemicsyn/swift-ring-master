@@ -5,6 +5,9 @@ log_facility = LOG_LOCAL0
 
 #swiftdir = /etc/swift
 
+#If this path exists orchestration will pause until the file is removed
+#pause_file_path = /tmp/.srm-pause
+
 # path to your builder files
 #account_builder = /etc/swift/account.builder
 #container_builder = /etc/swift/container.builder

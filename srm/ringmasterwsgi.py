@@ -81,6 +81,7 @@ class RingMasterApp(object):
             self.current_md5[filename] = get_md5sum(filename)
 
     def handle_ring(self, env, start_response):
+        """handle requests to /ring"""
         base, ringfile = split_path(env['PATH_INFO'], minsegs=1, maxsegs=2,
                                     rest_with_last=True)
         if ringfile not in self.ring_files:
@@ -155,7 +156,8 @@ def run_server():
         sys.exit(0)
 
     if len(sys.argv) >= 2:
-        daemon = RingMasterAppd('/tmp/rmad.pid')
+        daemon = RingMasterAppd(
+            '/var/run/swift/swift-ring-master-wsgi-server.pid')
         if 'start' == sys.argv[1]:
             conf = readconf(options.conf)
             daemon.start(conf['ringmaster_wsgi'])

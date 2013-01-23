@@ -1,11 +1,12 @@
 """
-Ring Master Daemon and Middleware for ring orchestration
+Ring Master Daemon for ring orchestration
 """
 
 import sys
 import optparse
 import subprocess
 import cPickle as pickle
+from os.path import exists
 from time import time, sleep
 from tempfile import mkstemp
 from datetime import datetime
@@ -36,6 +37,7 @@ class RingMasterServer(object):
              'object': conf.get('object_ring',
                                 '/etc/swift/object.ring.gz')}
         self.debug = conf.get('debug_mode', 'n') in TRUE_VALUES
+        self.pause_file = conf.get('pause_file_path', '/tmp/.srm-pause')
         self.oopmax = float(conf.get('oopmax', '5.0'))
         self.weight_shift = float(conf.get('weight_shift', '5.0'))
         self.backup_dir = conf.get('backup_dir', '/etc/swift/backups')
@@ -54,12 +56,21 @@ class RingMasterServer(object):
             conf['log_level'] = 'DEBUG'
         self.logger = get_logger(conf, 'ringmasterd', self.debug)
 
+    def pause_if_asked(self):
+        """Check if pause file exists and sleep until its removed if it does"""
+        if exists(self.pause_file):
+            self.logger.notice('--> Pause file found. Pausing orchestration!')
+            while exists(self.pause_file):
+                sleep(1)
+            self.logger.notice('--> Pause removed. Resuming orchestration!')
+
     def rebalance_ring(self, builder):
         """Rebalance a ring
 
         :param builder: builder to rebalance
         :returns: True on successful rebalance, False if it fails.
         """
+        self.pause_if_asked()
         devs_changed = builder.devs_changed
         try:
             last_balance = builder.get_balance()
@@ -85,6 +96,7 @@ class RingMasterServer(object):
 
         :param builder: builder to adjust
         """
+        self.pause_if_asked()
         for dev in builder.devs:
             if not dev:
                 continue
@@ -120,7 +132,11 @@ class RingMasterServer(object):
         :param builder: builder who's devices to check
         :returns: True if ring requires change
         """
-        change = False
+        self.pause_if_asked()
+        if builder.devs_changed:
+            return True
+        if not self.ring_balance_ok(builder):
+            return True
         for dev in builder.devs:
             if not dev:
                 continue
@@ -131,8 +147,8 @@ class RingMasterServer(object):
                                       dev['ip'] + '/' +
                                       dev['device'], dev['weight'],
                                       dev['target_weight']))
-                    change = True
-        return change
+                    return True
+        return False
 
     def dispersion_ok(self, swift_type):
         """Run a dispersion report and check whether its 'ok'
@@ -140,6 +156,7 @@ class RingMasterServer(object):
         :param swift_type: either 'container' or 'object'
         :returns: True if the dispersion report is 'ok'
         """
+        self.pause_if_asked()
         if swift_type == 'account':
             return True
         self.logger.debug("--> Running %s dispersion report" % swift_type)
@@ -167,6 +184,7 @@ class RingMasterServer(object):
         :param builder: builder to check
         :returns: True if min part hours have elapsed
         """
+        self.pause_if_asked()
         elapsed_hours = int(time() - builder._last_part_moves_epoch) / 3600
         self.logger.debug('--> partitions last moved %d hours ago [%s]'
                           % (elapsed_hours, datetime.utcfromtimestamp(
@@ -182,6 +200,7 @@ class RingMasterServer(object):
         :param btype: builder to check one of account|container|object
         :returns: True if min modify time has elapsed
         """
+        self.pause_if_asked()
         since_modified = time() - stat(self.builder_files[btype]).st_mtime
         self.logger.debug(
             '--> Ring last modified %d seconds ago.' % since_modified)
@@ -196,6 +215,7 @@ class RingMasterServer(object):
         :param builder: builder to check
         :returns: True ring balance is ok
         """
+        self.pause_if_asked()
         self.logger.debug(
             '--> Current balance: %.02f' % builder.get_balance())
         return builder.get_balance() <= self.balance_threshold
@@ -207,13 +227,14 @@ class RingMasterServer(object):
         :param builder: The builder to dump
         :returns: new ring file md5
         """
+        self.pause_if_asked()
         builder_file = self.builder_files[btype]
         try:
             fd, tmppath = mkstemp(dir=self.swiftdir, suffix='.tmp.builder')
             pickle.dump(builder.to_dict(), fdopen(fd, 'wb'), protocol=2)
             backup, backup_md5 = make_backup(builder_file, self.backup_dir)
-            self.logger.notice('--> Backed up %s to %s (%s)' % \
-                    (builder_file, backup, backup_md5))
+            self.logger.notice('--> Backed up %s to %s (%s)' %
+                              (builder_file, backup, backup_md5))
             chmod(tmppath, 0644)
             rename(tmppath, builder_file)
             try:
@@ -236,6 +257,7 @@ class RingMasterServer(object):
         :param builder: The builder to dump
         :returns: new ring file md5
         """
+        self.pause_if_asked()
         ring_file = self.ring_files[btype]
         fd, tmppath = mkstemp(dir=self.swiftdir, suffix='.tmp.ring.gz')
         builder.get_ring().save(tmppath)
@@ -245,8 +267,8 @@ class RingMasterServer(object):
             raise Exception('Ring Validate Failed')
         try:
             backup, backup_md5 = make_backup(ring_file, self.backup_dir)
-            self.logger.notice('--> Backed up %s to %s (%s)' % \
-                    (ring_file, backup, backup_md5))
+            self.logger.notice('--> Backed up %s to %s (%s)' %
+                              (ring_file, backup, backup_md5))
             chmod(tmppath, 0644)
             rename(tmppath, ring_file)
         except:
@@ -257,6 +279,7 @@ class RingMasterServer(object):
         """Check the rings, make any needed adjustments, and deploy the ring"""
         ring_changed = False
         for btype in self.builder_files:
+            self.pause_if_asked()
             self.logger.debug("=" * 79)
             self.logger.notice("Checking on %s ring..." % btype)
             self.logger.debug("=" * 79)
@@ -342,6 +365,7 @@ class RingMasterServer(object):
         self.logger.notice("-> Entering ring orchestration loop.")
         while True:
             try:
+                self.pause_if_asked()
                 self.orchestration_pass()
             except Exception:
                 self.logger.exception('Orchestration Error')
@@ -380,7 +404,7 @@ def run_server():
         sys.exit(0)
 
     if len(sys.argv) >= 2:
-        daemon = RingMasterd('/tmp/rmsd.pid')
+        daemon = RingMasterd('/var/run/swift/swift-ring-master-server.pid')
         if 'start' == sys.argv[1]:
             conf = readconf(options.conf)
             daemon.start(conf)

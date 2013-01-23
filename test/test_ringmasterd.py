@@ -31,12 +31,15 @@ class FakedBuilder(object):
             builder.add_dev({'id': next_dev_id, 'zone': zone, 'ip': ipaddr,
                              'port': int(port), 'device': device_name,
                              'weight': weight, 'meta': meta})
+            # add an empty dev
+            builder.devs.append(None)
             if balanced:
                 builder.rebalance()
         return builder
 
     def write_builder(self, tfile, builder):
         pickle.dump(builder.to_dict(), open(tfile, 'wb'), protocol=2)
+
 
 class test_ringmasterserver(unittest.TestCase):
 
@@ -69,32 +72,44 @@ class test_ringmasterserver(unittest.TestCase):
             ring_file += '.ring.gz'
             builder.get_ring().save(os.path.join(self.testdir, ring_file))
 
+    @patch('srm.ringmasterd.sleep')
+    @patch('srm.ringmasterd.exists')
+    def test_pause_if_asked(self, fexists, fsleep):
+        fsleep.return_value = True
+        fexists.side_effect = [True, True, False]
+        rmd = RingMasterServer(rms_conf={'ringmasterd': self.confdict})
+        rmd.logger = MagicMock()
+        rmd.pause_if_asked()
+        self.assertEquals(fsleep.call_count, 1)
+        self.assertEquals(fexists.call_count, 3)
+        self.assertEquals(rmd.logger.notice.call_count, 2)
+
     def test_adjust_ring(self):
         fb = FakedBuilder(device_count=4)
         builder = fb.gen_builder(balanced=False)
         rmd = RingMasterServer(rms_conf={'ringmasterd': self.confdict})
         rmd.logger = MagicMock()
-        #test no weight changes
+        # test no weight changes
         builder.devs[0]['target_weight'] = 100.0
         rmd.adjust_ring(builder)
         self.assertEquals(builder.devs[0]['weight'], 100.0)
-        #test weight shift 1 inc
+        # test weight shift 1 inc
         builder.devs[0]['target_weight'] = 110.0
         rmd.adjust_ring(builder)
         self.assertEquals(builder.devs[0]['weight'], 105.0)
-        #test weight shift partial increment
+        # test weight shift partial increment
         builder.devs[0]['target_weight'] = 107.0
         rmd.adjust_ring(builder)
         self.assertEquals(builder.devs[0]['weight'], 107.0)
-        #test weight shift down one increment
+        # test weight shift down one increment
         builder.devs[1]['target_weight'] = 90.0
         rmd.adjust_ring(builder)
         self.assertEquals(builder.devs[1]['weight'], 95.0)
-        #test weight shift down partial increment
+        # test weight shift down partial increment
         builder.devs[1]['target_weight'] = 92.0
         rmd.adjust_ring(builder)
         self.assertEquals(builder.devs[1]['weight'], 92.0)
-        #test weight shift down an exact increment
+        # test weight shift down an exact increment
         builder.devs[1]['target_weight'] = 87.0
         rmd.adjust_ring(builder)
         self.assertEquals(builder.devs[1]['weight'], 87.0)
@@ -102,7 +117,9 @@ class test_ringmasterserver(unittest.TestCase):
     def test_ring_requires_change(self):
         fb = FakedBuilder(device_count=4)
         builder = fb.gen_builder(balanced=False)
+        builder.devs_changed = False
         rmd = RingMasterServer(rms_conf={'ringmasterd': self.confdict})
+        rmd.ring_balance_ok = MagicMock(return_value=True)
         rmd.logger = MagicMock()
         # test no change, with no target_weight
         self.assertFalse(rmd.ring_requires_change(builder))
@@ -111,6 +128,13 @@ class test_ringmasterserver(unittest.TestCase):
         self.assertFalse(rmd.ring_requires_change(builder))
         # test with change
         builder.devs[0]['target_weight'] = 42.0
+        self.assertTrue(rmd.ring_requires_change(builder))
+        # test brand new ring (i.e. newly added devs)
+        builder = fb.gen_builder(balanced=False)
+        self.assertTrue(rmd.ring_requires_change(builder))
+        # test brand new ring bad balance
+        builder.devs_changed = False
+        rmd.ring_balance_ok = MagicMock(return_value=False)
         self.assertTrue(rmd.ring_requires_change(builder))
 
     @patch('subprocess.Popen')
@@ -145,7 +169,8 @@ class test_ringmasterserver(unittest.TestCase):
         dsp_rpt_missing = dsp_rpt
         dsp_rpt_missing['container']['missing_2'] = 42
         dsp_rpt_missing['object']['missing_2'] = 42
-        popen.return_value.communicate.return_value = [json.dumps(dsp_rpt_missing)]
+        popen.return_value.communicate.return_value = [json.dumps(
+            dsp_rpt_missing)]
         self.assertFalse(rmd.dispersion_ok('container'))
         self.assertFalse(rmd.dispersion_ok('object'))
         self.assertEquals(rmd.logger.debug.call_count, 4)
@@ -169,8 +194,9 @@ class test_ringmasterserver(unittest.TestCase):
         self.assertEquals(rmd.logger.exception.call_count, 2)
         rmd.logger.reset_mock()
         # test no output
-        popen.return_value.communicate.return_value = [json.dumps({'container': {},
-                                                                   'object': {}})]
+        popen.return_value.communicate.return_value = [json.dumps(
+            {'container': {},
+             'object': {}})]
         self.assertFalse(rmd.dispersion_ok('container'))
         self.assertFalse(rmd.dispersion_ok('object'))
         self.assertEquals(rmd.logger.debug.call_count, 2)
@@ -212,7 +238,7 @@ class test_ringmasterserver(unittest.TestCase):
         builder._last_part_moves_epoch = int(time.time()) - 424242
         self.assertTrue(rmd.min_part_hours_ok(builder))
 
-    #fixme - wtf am i doing here
+    # fixme - wtf am i doing here
     @patch('srm.ringmasterd.chmod')
     @patch('srm.ringmasterd.rename')
     @patch('srm.ringmasterd.mkstemp')
@@ -220,8 +246,9 @@ class test_ringmasterserver(unittest.TestCase):
     @patch('srm.ringmasterd.get_md5sum')
     @patch('srm.ringmasterd.pickle.dump')
     @patch('srm.ringmasterd.close')
-    def test_write_builder2(self, fdclose, pd, gmd5, mbackup, ftmp, frename, fc):
-        fc.return_value = True
+    def test_write_builder(self, fdclose, pd, gmd5, mbackup, ftmp, frename,
+                           fake_chmod):
+        fake_chmod.return_value = True
         frename.return_value = True
         ftmp.return_value = [1, '/fake/path/a.file']
         mbackup.return_value = ['testit', 'somemd5']
@@ -230,14 +257,17 @@ class test_ringmasterserver(unittest.TestCase):
         fdclose.return_value = Mock()
         fb = FakedBuilder(device_count=4)
         builder = fb.gen_builder(balanced=False)
+        builder.devs_changed = False
         rmd = RingMasterServer(rms_conf={'ringmasterd': self.confdict})
         rmd.swiftdir = os.path.realpath('.')
         rmd.logger = MagicMock()
         self.assertTrue(rmd.write_builder('object', builder))
-        self.assertEquals(ftmp.mock_calls, [call(suffix='.tmp.builder', dir=os.path.realpath('.'))])
+        self.assertEquals(ftmp.mock_calls, [call(
+            suffix='.tmp.builder', dir=os.path.realpath('.'))])
         fake_builder_path = os.path.join(self.testdir, 'object.builder')
         fake_builder_bdir = os.path.join(self.testdir, 'backup')
-        self.assertEquals(mbackup.mock_calls, [call(fake_builder_path, fake_builder_bdir)])
+        self.assertEquals(
+            mbackup.mock_calls, [call(fake_builder_path, fake_builder_bdir)])
         self.assertEquals(fdclose.mock_calls, [call(1)])
         ftmp.return_value = [2, '/fake/path/a.file']
         mbackup.side_effect = Exception('OMGMONKEY!')
@@ -269,7 +299,7 @@ class test_ringmasterserver(unittest.TestCase):
             rmd.write_ring.reset_mock()
             srs.reset_mock()
 
-        #passes with no changes
+        # passes with no changes
         rmd.ring_requires_change.return_value = False
         rmd.orchestration_pass()
         self.assertFalse(rmd.min_part_hours_ok.called)
@@ -282,7 +312,7 @@ class test_ringmasterserver(unittest.TestCase):
         self.assertEquals(srs.mock_calls, [call(rmd.recheck_interval)])
         _reset_all()
 
-        #change required, with min_part_hours enabled and everything ready
+        # change required, with min_part_hours enabled and everything ready
         rmd.ring_requires_change.return_value = True
         rmd.mph_enabled = True
         rmd.orchestration_pass()
@@ -297,7 +327,7 @@ class test_ringmasterserver(unittest.TestCase):
                           [call(rmd.recheck_after_change_interval)])
         _reset_all()
 
-        #change required, min_part_hours enabled and min_part_hours not ready
+        # change required, min_part_hours enabled and min_part_hours not ready
         rmd.ring_requires_change.return_value = True
         rmd.mph_enabled = True
         rmd.min_part_hours_ok.return_value = False
@@ -313,7 +343,7 @@ class test_ringmasterserver(unittest.TestCase):
         rmd.min_part_hours_ok.return_value = True
         _reset_all()
 
-        #change required, min_part_hours enabled and min_modify_time not ready
+        # change required, min_part_hours enabled and min_modify_time not ready
         rmd.ring_requires_change.return_value = True
         rmd.mph_enabled = True
         rmd.min_modify_time.return_value = False
@@ -329,7 +359,7 @@ class test_ringmasterserver(unittest.TestCase):
         rmd.min_modify_time.return_value = True
         _reset_all()
 
-        #change required, min_part_hours enabled and dispersion not ready
+        # change required, min_part_hours enabled and dispersion not ready
         rmd.ring_requires_change.return_value = True
         rmd.mph_enabled = True
         rmd.dispersion_ok.return_value = False
@@ -345,7 +375,7 @@ class test_ringmasterserver(unittest.TestCase):
         rmd.dispersion_ok.return_value = True
         _reset_all()
 
-        #change required, min_part_hours enabled and ring balance not ready
+        # change required, min_part_hours enabled and ring balance not ready
         rmd.ring_requires_change.return_value = True
         rmd.mph_enabled = True
         rmd.ring_balance_ok.return_value = False

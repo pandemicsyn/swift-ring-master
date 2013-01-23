@@ -1,3 +1,6 @@
+"""
+Random utils
+"""
 from hashlib import md5
 from os import mkdir
 from swift.common.ring import Ring
@@ -27,6 +30,19 @@ def get_md5sum(filename, chunk_size=4096):
     return md5sum.hexdigest()
 
 
+def md5matches(self, target_file, expected_md5):
+    """Check if a file matches an md5sum
+
+    :param target_file: file to check
+    :param expected_md5: md5 to compare again
+    :returns: True or False if md5 matches
+    """
+    if get_md5sum(target_file) == expected_md5:
+        return True
+    else:
+        return False
+
+
 def make_backup(filename, backup_dir):
     """ Create a backup of a file
     :params filename: The file to backup
@@ -44,6 +60,11 @@ def make_backup(filename, backup_dir):
 
 
 def is_valid_ring(ring_file):
+    """Check if a ring file is 'valid'
+        - make sure it has more than one device
+        - make sure get_part_nodes works
+    :returns: True or False if ring is valid
+    """
     try:
         ring = Ring(ring_file)
         if len(ring.devs) < 1:
@@ -106,12 +127,12 @@ class Daemon:
         # redirect standard file descriptors
         sys.stdout.flush()
         sys.stderr.flush()
-        si = file(self.stdin, 'r')
-        so = file(self.stdout, 'a+')
-        se = file(self.stderr, 'a+', 0)
-        os.dup2(si.fileno(), sys.stdin.fileno())
-        os.dup2(so.fileno(), sys.stdout.fileno())
-        os.dup2(se.fileno(), sys.stderr.fileno())
+        stin = file(self.stdin, 'r')
+        stout = file(self.stdout, 'a+')
+        sterr = file(self.stderr, 'a+', 0)
+        os.dup2(stin.fileno(), sys.stdin.fileno())
+        os.dup2(stout.fileno(), sys.stdout.fileno())
+        os.dup2(sterr.fileno(), sys.stderr.fileno())
 
         # write pidfile
         atexit.register(self.delpid)
@@ -119,6 +140,7 @@ class Daemon:
         file(self.pidfile, 'w+').write("%s\n" % pid)
 
     def delpid(self):
+        """Remove pid file"""
         os.remove(self.pidfile)
 
     def start(self, *args, **kw):

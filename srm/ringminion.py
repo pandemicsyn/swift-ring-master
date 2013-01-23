@@ -1,3 +1,6 @@
+"""
+ring-minion
+"""
 import os
 import sys
 import optparse
@@ -7,7 +10,7 @@ from os.path import basename, dirname, join as pathjoin, exists
 import eventlet
 from eventlet.green import urllib2
 from swift.common.utils import get_logger, readconf, TRUE_VALUES
-from srm.utils import Daemon, get_md5sum, is_valid_ring
+from srm.utils import Daemon, get_md5sum, md5matches, is_valid_ring
 
 
 class RingMinion(object):
@@ -39,12 +42,6 @@ class RingMinion(object):
             else:
                 continue
 
-    def md5matches(self, target_file, expected_md5):
-        if get_md5sum(target_file) == expected_md5:
-            return True
-        else:
-            return False
-
     def ring_updated(self, ring_type):
         """update a ring
 
@@ -67,33 +64,27 @@ class RingMinion(object):
                     self.logger.warning("No etag provided by ring-master")
                     return False
                 fd, tmppath = mkstemp(dir=tmp, suffix='.tmp')
-                try:
-                    with os.fdopen(fd, 'wb') as fdo:
-                        while True:
-                            chunk = response.read(4096)
-                            if not chunk:
-                                break
-                            fdo.write(chunk)
-                        fdo.flush()
-                        os.fsync(fdo)
-                        if self.md5matches(tmppath, expected_md5):
-                            if not is_valid_ring(tmppath):
-                                os.unlink(tmppath)
-                                self.logger.error('error validating ring')
-                                return False
-                            os.chmod(tmppath, 0644)
-                            os.rename(tmppath, self.rings[ring_type])
-                            self.current_md5[self.rings[ring_type]] = expected_md5
-                            return True
-                        else:
-                            self.logger.warning('md5 missmatch')
+                with os.fdopen(fd, 'wb') as fdo:
+                    while True:
+                        chunk = response.read(4096)
+                        if not chunk:
+                            break
+                        fdo.write(chunk)
+                    fdo.flush()
+                    os.fsync(fdo)
+                    if self.md5matches(tmppath, expected_md5):
+                        if not is_valid_ring(tmppath):
                             os.unlink(tmppath)
+                            self.logger.error('error validating ring')
                             return False
-                except:
-                    try:
+                        os.chmod(tmppath, 0644)
+                        os.rename(tmppath, self.rings[ring_type])
+                        self.current_md5[self.rings[ring_type]] = expected_md5
+                        return True
+                    else:
+                        self.logger.warning('md5 missmatch')
                         os.unlink(tmppath)
-                    except OSError:
-                        pass
+                        return False
             else:
                 self.logger.warning('Got %s status with body:' % response.code)
                 self.logger.warning(response.read())
@@ -110,6 +101,7 @@ class RingMinion(object):
             return False
 
     def watch_loop(self):
+        """Start monitoring ring files for changes"""
         # insert a random delay on startup so we don't flood the server
         eventlet.sleep(choice(range(self.start_delay)))
         while True:
@@ -128,6 +120,7 @@ class RingMinion(object):
                 eventlet.sleep(self.check_interval)
 
     def once(self):
+        """Just check for changes once."""
         for ring in self.rings:
             changed = self.ring_updated(ring)
             if changed:
@@ -173,7 +166,7 @@ def run_server():
         sys.exit(0)
 
     if len(sys.argv) >= 2:
-        daemon = RingMiniond('/tmp/rmcd.pid')
+        daemon = RingMiniond('/var/run/swift/swift-ring-minion-server.pid')
         if 'start' == sys.argv[1]:
             conf = readconf(options.conf)
             daemon.start(conf['minion'])
