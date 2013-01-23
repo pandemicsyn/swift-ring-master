@@ -1,5 +1,5 @@
 """
-Ring Master Daemon and Middleware for ring orchestration
+Ring Master Daemon for ring orchestration
 """
 
 import sys

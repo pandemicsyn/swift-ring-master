@@ -1,3 +1,6 @@
+"""
+ring-minion
+"""
 import os
 import sys
 import optparse
@@ -7,7 +10,7 @@ from os.path import basename, dirname, join as pathjoin, exists
 import eventlet
 from eventlet.green import urllib2
 from swift.common.utils import get_logger, readconf, TRUE_VALUES
-from srm.utils import Daemon, get_md5sum, is_valid_ring
+from srm.utils import Daemon, get_md5sum, md5matches, is_valid_ring
 
 
 class RingMinion(object):
@@ -38,12 +41,6 @@ class RingMinion(object):
                     get_md5sum(self.rings[ring])
             else:
                 continue
-
-    def md5matches(self, target_file, expected_md5):
-        if get_md5sum(target_file) == expected_md5:
-            return True
-        else:
-            return False
 
     def ring_updated(self, ring_type):
         """update a ring
@@ -104,6 +101,7 @@ class RingMinion(object):
             return False
 
     def watch_loop(self):
+        """Start monitoring ring files for changes"""
         # insert a random delay on startup so we don't flood the server
         eventlet.sleep(choice(range(self.start_delay)))
         while True:
@@ -122,6 +120,7 @@ class RingMinion(object):
                 eventlet.sleep(self.check_interval)
 
     def once(self):
+        """Just check for changes once."""
         for ring in self.rings:
             changed = self.ring_updated(ring)
             if changed:
