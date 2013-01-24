@@ -1,5 +1,52 @@
-swift-ring-master - [![Build Status](https://travis-ci.org/pandemicsyn/swift-ring-master.png?branch=master)](https://travis-ci.org/pandemicsyn/swift-ring-master)
-=================
+# swift-ring-master - [![Build Status](https://travis-ci.org/pandemicsyn/swift-ring-master.png?branch=master)](https://travis-ci.org/pandemicsyn/swift-ring-master)
+
+swift-target-weight
+===================
+
+The swift-traget-weight cli is a simple utility that lets you list or change/set
+a the target weight of the devices in the ring:
+
+    fhines@ubuntu:~$ swift-target-weight -h
+    Usage:
+        usage: swift-target-weight [-l][-t tgt_weight][-s search_pattern] builder_file
+
+        ex: swift-target-weight -t 50 -s 127.0.0.5 /etc/swift/object.builder
+
+
+    Options:
+      -h, --help            show this help message and exit
+      -t TARGET_WEIGHT, --target-weight=TARGET_WEIGHT
+                            Set given target weight on devices
+      -l, --list            List target weight of devices
+      -s SEARCH, --search=SEARCH
+                            swift-ring-builder compatible search pattern to use
+      --swiftdir=SWIFTDIR   Default = /etc/swift
+
+The specified search pattern is compatible to swift-ring-builder's search format:
+
+    The <search-pattern> can be of the form:
+        d<device_id>z<zone>-<ip>:<port>/<device_name>_<meta>
+        Any part is optional, but you must include at least one part.
+        Examples:
+            d74              Matches the device id 74
+            z1               Matches devices in zone 1
+            z1-1.2.3.4       Matches devices in zone 1 with the ip 1.2.3.4
+            1.2.3.4          Matches devices in any zone with the ip 1.2.3.4
+            z1:5678          Matches devices in zone 1 using port 5678
+            :5678            Matches devices that use port 5678
+            /sdb1            Matches devices with the device name sdb1
+            _shiny           Matches devices with shiny in the meta data
+            _"snet: 5.6.7.8" Matches devices with snet: 5.6.7.8 in the meta data
+            [::1]            Matches devices in any zone with the ip ::1
+            z1-[::1]:5678    Matches devices in zone 1 with ip ::1 and port 5678
+        Most specific example:
+            d74z1-1.2.3.4:5678/sdb1_"snet: 5.6.7.8"
+        Nerd explanation:
+            All items require their single character prefix except the ip, in which
+            case the - is optional unless the device id or zone is also included.
+
+swift-ring-master-server
+========================
 
 The swift-ring-master-server is a simple daemon that automates ring and ring
 builder change. When it see's that a devices weight does not equal its "target" 

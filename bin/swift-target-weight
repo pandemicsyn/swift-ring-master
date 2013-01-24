@@ -1,0 +1,117 @@
+#!/usr/bin/env python
+"""Simple cli tool to let you list or set device target weights"""
+
+import optparse
+import cPickle as pickle
+from os import rename, fdopen
+from sys import exit, argv
+from tempfile import mkstemp
+from os.path import isfile, abspath, dirname
+from swift.common.ring import RingBuilder
+from swift.common.exceptions import LockTimeout
+from swift.common.utils import lock_parent_directory
+
+
+def _dump_builder(builder, builder_file):
+    """Write out new builder files
+
+    :param builder: The builder to dump
+    :builder_file: The builder file to write to
+    """
+    with lock_parent_directory(builder_file, 5):
+        fd, tmppath = mkstemp(dir=dirname(builder_file), suffix='.tmp.builder')
+        pickle.dump(builder.to_dict(), fdopen(fd, 'wb'), protocol=2)
+        rename(tmppath, builder_file)
+
+
+def _print_devs(devs):
+    """print devs to stdout"""
+    for dev in devs:
+        if 'target_weight' in dev:
+            print "{'target_weight': %(target_weight).2f, " \
+                  "'zone': %(zone)d, 'weight': %(weight).2f, " \
+                  "'ip': '%(ip)s', 'id': %(id)s, 'meta': '%(meta)s', " \
+                  "'device': '%(device)s', 'port': '%(port)d'}" % dev
+        else:
+            print "{'target_weight': None, " \
+                  "'zone': %(zone)d, 'weight': %(weight).2f, " \
+                  "'ip': '%(ip)s', 'id': %(id)s, 'meta': '%(meta)s', " \
+                  "'device': '%(device)s', 'port': '%(port)d'}" % dev
+
+
+def cli():
+    """List/Modify device weights in a builder"""
+    usage = '''
+    usage: %prog [-l][-t tgt_weight][-s search_pattern] builder_file
+
+    ex: %prog -t 50 -s 127.0.0.5 object.builder
+    '''
+    args = optparse.OptionParser(usage)
+    args.add_option('--target-weight', '-t', type="float",
+                    help="Set given target weight on devices")
+    args.add_option('--list', '-l', action="store_true",
+                    help="List target weight of devices")
+    args.add_option('--search', '-s',
+                    help="swift-ring-builder compatible search pattern to use")
+    args.add_option('--swiftdir', default="/etc/swift",
+                    help="Default = /etc/swift")
+    options, arguments = args.parse_args()
+
+    if len(argv) <= 1:
+        args.print_help()
+        exit(0)
+    if len(argv) <= 1 or len(arguments) > 1:
+        args.print_help()
+        exit(0)
+    if not arguments:
+        args.print_help()
+        exit("Failed to specify a builder file")
+    else:
+        builder_file = abspath(arguments[0])
+        if not isfile(builder_file):
+            print "Not a valid builder file."
+            print "Perhaps you need to create it first?"
+            exit(1)
+        else:
+            builder = RingBuilder.load(builder_file)
+
+    if options.list:
+        if options.search:
+            devs = builder.search_devs(options.search)
+        else:
+            devs = builder.search_devs('')
+        if not devs:
+            print "No devices found on listing."
+            exit(0)
+        _print_devs(devs)
+
+    if options.target_weight:
+        if not options.search:
+            args.print_help()
+            exit('You must provide a search string if changing target weight.')
+        try:
+            target_weight = float(options.target_weight)
+        except ValueError:
+            exit("Aborting. Invalid target weight. Must be a digit/float.")
+        if target_weight < 0:
+            exit("Aborting. Invalid target weight. Must be positive.")
+        devs = builder.search_devs(options.search)
+        if not devs:
+            exit('No devs match search pattern.')
+        print "Devices to update: "
+        _print_devs(devs)
+        for dev in devs:
+            dev['target_weight'] = target_weight
+        _print_devs(devs)
+        confirm_resp = raw_input('Ok to update ? [y/n]: ').strip().lower()
+        if not confirm_resp in ['y', 'yes']:
+            exit('Discarding changes and aborting...')
+        print "Dumping builder..."
+        try:
+            _dump_builder(builder, builder_file)
+        except LockTimeout:
+            print "Got lock_timeout. Orchestration likely in progress. Retry."
+        print "Done."
+
+if __name__ == '__main__':
+    cli()

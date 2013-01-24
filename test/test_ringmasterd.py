@@ -301,7 +301,7 @@ class test_ringmasterserver(unittest.TestCase):
 
         # passes with no changes
         rmd.ring_requires_change.return_value = False
-        rmd.orchestration_pass()
+        ring_changed = rmd.orchestration_pass('object')
         self.assertFalse(rmd.min_part_hours_ok.called)
         self.assertFalse(rmd.min_modify_time.called)
         self.assertFalse(rmd.dispersion_ok.called)
@@ -309,13 +309,13 @@ class test_ringmasterserver(unittest.TestCase):
         self.assertFalse(rmd.rebalance_ring.called)
         self.assertFalse(rmd.write_builder.called)
         self.assertFalse(rmd.write_ring.called)
-        self.assertEquals(srs.mock_calls, [call(rmd.recheck_interval)])
+        self.assertFalse(ring_changed)
         _reset_all()
 
         # change required, with min_part_hours enabled and everything ready
         rmd.ring_requires_change.return_value = True
         rmd.mph_enabled = True
-        rmd.orchestration_pass()
+        ring_changed = rmd.orchestration_pass('object')
         self.assertTrue(rmd.min_part_hours_ok.called)
         self.assertTrue(rmd.min_modify_time.called)
         self.assertTrue(rmd.dispersion_ok.called)
@@ -323,15 +323,14 @@ class test_ringmasterserver(unittest.TestCase):
         self.assertTrue(rmd.rebalance_ring.called)
         self.assertTrue(rmd.write_builder.called)
         self.assertTrue(rmd.write_ring.called)
-        self.assertEquals(srs.mock_calls,
-                          [call(rmd.recheck_after_change_interval)])
+        self.assertTrue(ring_changed)
         _reset_all()
 
         # change required, min_part_hours enabled and min_part_hours not ready
         rmd.ring_requires_change.return_value = True
         rmd.mph_enabled = True
         rmd.min_part_hours_ok.return_value = False
-        rmd.orchestration_pass()
+        ring_changed = rmd.orchestration_pass('object')
         self.assertTrue(rmd.min_part_hours_ok.called)
         self.assertFalse(rmd.min_modify_time.called)
         self.assertFalse(rmd.dispersion_ok.called)
@@ -339,7 +338,7 @@ class test_ringmasterserver(unittest.TestCase):
         self.assertFalse(rmd.rebalance_ring.called)
         self.assertFalse(rmd.write_builder.called)
         self.assertFalse(rmd.write_ring.called)
-        self.assertEquals(srs.mock_calls, [call(rmd.recheck_interval)])
+        self.assertFalse(ring_changed)
         rmd.min_part_hours_ok.return_value = True
         _reset_all()
 
@@ -347,7 +346,7 @@ class test_ringmasterserver(unittest.TestCase):
         rmd.ring_requires_change.return_value = True
         rmd.mph_enabled = True
         rmd.min_modify_time.return_value = False
-        rmd.orchestration_pass()
+        ring_changed = rmd.orchestration_pass('object')
         self.assertTrue(rmd.min_part_hours_ok.called)
         self.assertTrue(rmd.min_modify_time.called)
         self.assertFalse(rmd.dispersion_ok.called)
@@ -355,7 +354,7 @@ class test_ringmasterserver(unittest.TestCase):
         self.assertFalse(rmd.rebalance_ring.called)
         self.assertFalse(rmd.write_builder.called)
         self.assertFalse(rmd.write_ring.called)
-        self.assertEquals(srs.mock_calls, [call(rmd.recheck_interval)])
+        self.assertFalse(ring_changed)
         rmd.min_modify_time.return_value = True
         _reset_all()
 
@@ -363,7 +362,7 @@ class test_ringmasterserver(unittest.TestCase):
         rmd.ring_requires_change.return_value = True
         rmd.mph_enabled = True
         rmd.dispersion_ok.return_value = False
-        rmd.orchestration_pass()
+        ring_changed = rmd.orchestration_pass('object')
         self.assertTrue(rmd.min_part_hours_ok.called)
         self.assertTrue(rmd.min_modify_time.called)
         self.assertTrue(rmd.dispersion_ok.called)
@@ -371,7 +370,7 @@ class test_ringmasterserver(unittest.TestCase):
         self.assertFalse(rmd.rebalance_ring.called)
         self.assertFalse(rmd.write_builder.called)
         self.assertFalse(rmd.write_ring.called)
-        self.assertEquals(srs.mock_calls, [call(rmd.recheck_interval)])
+        self.assertFalse(ring_changed)
         rmd.dispersion_ok.return_value = True
         _reset_all()
 
@@ -379,7 +378,7 @@ class test_ringmasterserver(unittest.TestCase):
         rmd.ring_requires_change.return_value = True
         rmd.mph_enabled = True
         rmd.ring_balance_ok.return_value = False
-        rmd.orchestration_pass()
+        ring_changed = rmd.orchestration_pass('object')
         self.assertTrue(rmd.min_part_hours_ok.called)
         self.assertTrue(rmd.min_modify_time.called)
         self.assertTrue(rmd.dispersion_ok.called)
@@ -387,8 +386,7 @@ class test_ringmasterserver(unittest.TestCase):
         self.assertTrue(rmd.rebalance_ring.called)
         self.assertTrue(rmd.write_builder.called)
         self.assertTrue(rmd.write_ring.called)
-        self.assertEquals(srs.mock_calls,
-                          [call(rmd.recheck_after_change_interval)])
+        self.assertTrue(ring_changed)
         rmd.ring_balance_ok.return_value = True
         _reset_all()
 
