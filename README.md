@@ -3,8 +3,8 @@
 swift-target-weight
 ===================
 
-The swift-traget-weight cli is a simple utility that lets you list or change/set
-a the target weight of the devices in the ring:
+The swift-traget-weight cli is a simple utility that lets you list or change/set the
+target weight of the devices in the ring:
 
     fhines@ubuntu:~$ swift-target-weight -h
     Usage:
@@ -22,7 +22,7 @@ a the target weight of the devices in the ring:
                             swift-ring-builder compatible search pattern to use
       --swiftdir=SWIFTDIR   Default = /etc/swift
 
-The specified search pattern is compatible to swift-ring-builder's search format:
+The specified search pattern is compatible with swift-ring-builder's search format:
 
     The <search-pattern> can be of the form:
         d<device_id>z<zone>-<ip>:<port>/<device_name>_<meta>
@@ -49,9 +49,10 @@ swift-ring-master-server
 ========================
 
 The swift-ring-master-server is a simple daemon that automates ring and ring
-builder change. When it see's that a devices weight does not equal its "target" 
-weight it will incrementally adjust, rebalance, and deploy the ring until the 
-device(s) reach their target weight.
+builder change. It handles the removal or addition of devices as well as weight changes. 
+For example, when it see's that a devices weight does not equal its "target" weight it 
+will incrementally adjust, rebalance, and deploy the ring until the device(s) reach their
+target weight (performing multiple rebalances if needed).
 
 It attempts to make builder/ring changes in a "safe" fashion by taking
 into account:
