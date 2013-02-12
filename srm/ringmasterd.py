@@ -39,20 +39,19 @@ class RingMasterServer(object):
                                 '/etc/swift/object.ring.gz')}
         self.debug = conf.get('debug_mode', 'n') in TRUE_VALUES
         self.pause_file = conf.get('pause_file_path', '/tmp/.srm-pause')
-        self.oopmax = float(conf.get('oopmax', '5.0'))
-        self.weight_shift = float(conf.get('weight_shift', '5.0'))
+        self.weight_shift = float(conf.get('weight_shift', '10.0'))
         self.backup_dir = conf.get('backup_dir', '/etc/swift/backups')
         self.recheck_interval = int(conf.get('interval', '120'))
         self.recheck_after_change_interval = int(conf.get('change_interval',
-                                                          '120'))
+                                                          '3600'))
         self.mph_enabled = conf.get('min_part_hours_check', 'n') in TRUE_VALUES
         self.sec_since_modified = int(conf.get('min_seconds_since_change',
-                                               '10'))
+                                               '120'))
         self.balance_threshold = float(conf.get('balance_threshold', '2'))
         self.dispersion_pct = {'container': float(conf.get('container_min_pct',
-                                                           '99.50')),
+                                                           '99.75')),
                                'object': float(conf.get('object_min_pct',
-                                                        '99.50'))}
+                                                        '99.75'))}
         self.lock_timeout = int(conf.get('lock_timeout', '90'))
         if self.debug:
             conf['log_level'] = 'DEBUG'

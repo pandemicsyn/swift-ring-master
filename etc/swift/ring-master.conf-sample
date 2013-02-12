@@ -22,30 +22,27 @@ log_facility = LOG_LOCAL0
 #backup_dir = /etc/swift/backups
 
 # weight shift [in|de]crement (by how much to change the weight on a pass)
-#weight_shift = 5.0
+#weight_shift = 10.0
 
 # how often to check for changes
 #interval = 120
 
 # how long to wait to check again after making a change
-#change_interval = 300
+#change_interval = 3600
 
 # Ring balance threshold. Above this value we'll simply keep try to rebalance
 # on each pass before making further changes
 #balance_threshold = 2.0
 
-# max oop pct threshold - why is this still here?
-#oopmax = 5.0
-
 # minimum time we must wait after a builder file has been externally changed
 # if you're adding nodes this gives you a grace period to make changes before
 # ring orchestration kicks in and starts deploying the ring
-#min_seconds_since_change = 10
+#min_seconds_since_change = 120
 
 # dispersion report pct found thresholds
 # if a disperion report finds less than this pct no change will be made
-#container_min_pct = 99.50
-#object_min_pct = 99.50
+#container_min_pct = 99.75
+#object_min_pct = 99.75
 
 [ringmaster_wsgi]
 #standard swift logger settings
