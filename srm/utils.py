@@ -30,7 +30,7 @@ def get_md5sum(filename, chunk_size=4096):
     return md5sum.hexdigest()
 
 
-def md5matches(self, target_file, expected_md5):
+def md5matches(target_file, expected_md5):
     """Check if a file matches an md5sum
 
     :param target_file: file to check
