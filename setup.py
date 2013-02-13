@@ -43,7 +43,8 @@ setup(
         'Environment :: No Input/Output (Daemon)',
         ],
     install_requires=install_requires,
-    scripts=['bin/swift-ring-master-server',
+    scripts=['bin/swift-target-weight',
+             'bin/swift-ring-master-server',
              'bin/swift-ring-master-wsgi-server',
              'bin/swift-ring-minion-server'],
     data_files = data_files)
