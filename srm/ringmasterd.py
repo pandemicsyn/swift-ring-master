@@ -268,7 +268,7 @@ class RingMasterServer(object):
             close(fd)
             if not is_valid_ring(tmppath):
                 unlink(tmppath)
-            raise Exception('Ring Validate Failed')
+                raise Exception('Ring Validate Failed')
             backup, backup_md5 = make_backup(ring_file, self.backup_dir)
             self.logger.notice('--> Backed up %s to %s (%s)' %
                               (ring_file, backup, backup_md5))
