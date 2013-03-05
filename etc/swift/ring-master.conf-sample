@@ -1,7 +1,7 @@
 [ringmasterd]
 
 #standard swift logger settings
-log_facility = LOG_LOCAL0
+log_facility = LOG_LOCAL2
 
 #swiftdir = /etc/swift
 
@@ -46,9 +46,9 @@ log_facility = LOG_LOCAL0
 
 [ringmaster_wsgi]
 #standard swift logger settings
-log_facility = LOG_LOCAL0
+log_facility = LOG_LOCAL2
 #swiftdir = /etc/swift
 # Listen on this port
-#serve_ring_port = 8090
+#server_ring_port = 8090
 # Bind to this address (or empty for all)
 #server_ring_address =

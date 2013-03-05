@@ -1,6 +1,6 @@
 [minion]
 #standard swift log options
-log_facility = LOG_LOCAL0
+log_facility = LOG_LOCAL2
 
 #swiftdir
 #swiftdir = /etc/swift

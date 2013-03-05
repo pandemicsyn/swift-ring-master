@@ -17,11 +17,11 @@ SWIFT_USER=swift
 case "$1" in
     start)
         echo "Starting swift-ring-master-wsgi"
-        su $SWIFT_USER -s /bin/bash -c "/usr/bin/swift-ring-master-wsgi-server start --conf=/etc/swift/ring-master-wsgi.conf"
+        su $SWIFT_USER -s /bin/bash -c "/usr/bin/swift-ring-master-wsgi-server start --conf=/etc/swift/ring-master.conf"
         ;;
     stop)
         echo "Stopping swift-ring-master-wsgi"
-        su $SWIFT_USER -s /bin/bash -c "/usr/bin/swift-ring-master-wsgi-server stop --conf=/etc/swift/ring-master-wsgi.conf"
+        su $SWIFT_USER -s /bin/bash -c "/usr/bin/swift-ring-master-wsgi-server stop --conf=/etc/swift/ring-master.conf"
         ;;
     *)
         echo "Usage: /etc/init.d/swift-ring-master-wsgi {start|stop}"
