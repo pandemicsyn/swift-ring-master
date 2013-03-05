@@ -30,7 +30,7 @@ class RingMinion(object):
         self.start_delay = int(conf.get('start_delay_range', '120'))
         self.check_interval = int(conf.get('check_interval', '30'))
         self.ring_master = conf.get('ring_master', 'http://127.0.0.1:8090/')
-        self.ring_master_timeout = int(conf.get('ring_master_timeout', '300'))
+        self.ring_master_timeout = int(conf.get('ring_master_timeout', '30'))
         self.debug = conf.get('debug', 'n') in TRUE_VALUES
         if self.debug:
             conf['log_level'] = 'DEBUG'
@@ -77,10 +77,19 @@ class RingMinion(object):
                             os.unlink(tmppath)
                             self.logger.error('error validating ring')
                             return False
-                        os.chmod(tmppath, 0644)
-                        os.rename(tmppath, self.rings[ring_type])
-                        self.current_md5[self.rings[ring_type]] = expected_md5
-                        return True
+                        try:
+                            os.chmod(tmppath, 0644)
+                            os.rename(tmppath, self.rings[ring_type])
+                            self.current_md5[self.rings[ring_type]] = \
+                                    expected_md5
+                            return True
+                        except OSError:
+                            try:
+                                os.unlink(tmppath)
+                            except OSError:
+                                pass
+                            self.logger.exception('Error moving tmp ring file')
+                            return False
                     else:
                         self.logger.warning('md5 missmatch')
                         os.unlink(tmppath)
@@ -109,11 +118,11 @@ class RingMinion(object):
                 for ring in self.rings:
                     changed = self.ring_updated(ring)
                     if changed:
-                        self.logger.info("%s ring updated" % ring)
+                        self.logger.info("%s updated" % ring)
                     elif changed is False:
-                        self.logger.info("%s ring check/change failed" % ring)
+                        self.logger.info("%s check/change failed!!" % ring)
                     elif changed is None:
-                        self.logger.info("%s ring remains unchanged" % ring)
+                        self.logger.info("%s remains unchanged" % ring)
                 eventlet.sleep(self.check_interval)
             except Exception:
                 self.logger.exception('Error watch loop')
