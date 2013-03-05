@@ -384,7 +384,7 @@ class RingMasterServer(object):
                 self.logger.exception('Orchestration LockTimeout Encountered')
             except Exception:
                 self.logger.exception('Orchestration Error')
-                raise
+                sleep(60)
             sleep(1)
 
 
