@@ -51,9 +51,8 @@ class RingMinion(object):
         url = "%sring/%s" % (self.ring_master, basename(self.rings[ring_type]))
         tmp = dirname(pathjoin(self.swiftdir, ring_type))
         headers = {'If-None-Match': self.current_md5[self.rings[ring_type]]}
-        self.logger.info("Checking on %s ring to retrieve %s" % (ring_type,
-                                                                 url))
-        self.logger.debug("Using headers: %s" % headers)
+        self.logger.debug("Checking on %s ring to retrieve %s" % (ring_type,
+                                                                  url))
         request = urllib2.Request(url, headers=headers)
         try:
             response = urllib2.urlopen(

@@ -24,4 +24,4 @@ log_facility = LOG_LOCAL0
 #ring_master_timeout = 30
 
 # debug mode
-#debug = false
+#debug = no
