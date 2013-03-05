@@ -81,7 +81,7 @@ class RingMinion(object):
                             os.chmod(tmppath, 0644)
                             os.rename(tmppath, self.rings[ring_type])
                             self.current_md5[self.rings[ring_type]] = \
-                                    expected_md5
+                                expected_md5
                             return True
                         except OSError:
                             try:

@@ -39,7 +39,7 @@ class RingMasterServer(object):
                                 '/etc/swift/object.ring.gz')}
         self.debug = conf.get('debug_mode', 'n') in TRUE_VALUES
         self.pause_file = conf.get('pause_file_path', '/tmp/.srm-pause')
-        self.weight_shift = float(conf.get('weight_shift', '10.0'))
+        self.weight_shift = float(conf.get('weight_shift', '25.0'))
         self.backup_dir = conf.get('backup_dir', '/etc/swift/backups')
         self.recheck_interval = int(conf.get('interval', '120'))
         self.recheck_after_change_interval = int(conf.get('change_interval',
@@ -238,17 +238,19 @@ class RingMasterServer(object):
                               (builder_file, backup, backup_md5))
             chmod(tmppath, 0644)
             rename(tmppath, builder_file)
-            try:
-                close(fd)
-            except OSError:
-                pass
         except Exception as err:
+            raise Exception('Error writing builder: %s' % err)
+        finally:
             if fd:
                 try:
                     close(fd)
                 except OSError:
                     pass
-            raise Exception('Error writing builder: %s' % err)
+            if tmppath:
+                try:
+                    unlink(tmppath)
+                except OSError:
+                    pass
         return get_md5sum(builder_file)
 
     def write_ring(self, btype, builder):
@@ -258,22 +260,33 @@ class RingMasterServer(object):
         :param builder: The builder to dump
         :returns: new ring file md5
         """
-        self.pause_if_asked()
-        ring_file = self.ring_files[btype]
-        fd, tmppath = mkstemp(dir=self.swiftdir, suffix='.tmp.ring.gz')
-        builder.get_ring().save(tmppath)
-        close(fd)
-        if not is_valid_ring(tmppath):
-            unlink(tmppath)
-            raise Exception('Ring Validate Failed')
         try:
+            self.pause_if_asked()
+            ring_file = self.ring_files[btype]
+            fd, tmppath = mkstemp(dir=self.swiftdir, suffix='.tmp.ring.gz')
+            builder.get_ring().save(tmppath)
+            close(fd)
+            if not is_valid_ring(tmppath):
+                unlink(tmppath)
+            raise Exception('Ring Validate Failed')
             backup, backup_md5 = make_backup(ring_file, self.backup_dir)
             self.logger.notice('--> Backed up %s to %s (%s)' %
                               (ring_file, backup, backup_md5))
             chmod(tmppath, 0644)
             rename(tmppath, ring_file)
-        except:
-            unlink(tmppath)
+        except Exception as err:
+            raise Exception('Error writing builder: %s' % err)
+        finally:
+            if fd:
+                try:
+                    close(fd)
+                except OSError:
+                    pass
+            if tmppath:
+                try:
+                    unlink(tmppath)
+                except OSError:
+                    pass
         return get_md5sum(ring_file)
 
     def orchestration_pass(self, btype):
