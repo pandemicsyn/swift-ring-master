@@ -1,4 +1,6 @@
 [ringmasterd]
+#user to run as
+#user = swift
 
 #standard swift logger settings
 log_facility = LOG_LOCAL2
@@ -45,6 +47,8 @@ log_facility = LOG_LOCAL2
 #object_min_pct = 99.75
 
 [ringmaster_wsgi]
+# user to run as
+#user = swift
 #standard swift logger settings
 log_facility = LOG_LOCAL2
 #swiftdir = /etc/swift

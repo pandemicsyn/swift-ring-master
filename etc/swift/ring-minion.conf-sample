@@ -1,4 +1,7 @@
 [minion]
+# user to run as
+#user = swift
+
 #standard swift log options
 log_facility = LOG_LOCAL2
 
@@ -17,8 +20,8 @@ log_facility = LOG_LOCAL2
 # how often to check for changes (in seconds)
 #check_interval = 30
 
-# url for the ring master server
-#ring_master = http://127.0.0.1:8090
+# url for the ring master server - don't forget the trailing slash
+#ring_master = http://127.0.0.1:8090/
 
 # timeout for the ring master server
 #ring_master_timeout = 30

@@ -174,14 +174,16 @@ def run_server():
         sys.exit(0)
 
     if len(sys.argv) >= 2:
-        daemon = RingMiniond('/tmp/.swift-ring-minion-server.pid')
+        conf = readconf(options.conf)
+        user = conf['minion'].get('user', 'swift')
+        daemon = RingMiniond('/var/run/swift-ring-minion.pid',
+                             user=user)
         if 'start' == sys.argv[1]:
-            conf = readconf(options.conf)
             daemon.start(conf['minion'])
         elif 'stop' == sys.argv[1]:
             daemon.stop()
         elif 'restart' == sys.argv[1]:
-            daemon.restart()
+            daemon.restart(conf['minion'])
         else:
             args.print_help()
             sys.exit(2)

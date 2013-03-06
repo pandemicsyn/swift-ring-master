@@ -419,14 +419,15 @@ def run_server():
         sys.exit(0)
 
     if len(sys.argv) >= 2:
-        daemon = RingMasterd('/tmp/.swift-ring-master-server.pid')
+        conf = readconf(options.conf)
+        user = conf['ringmasterd'].get('user', 'swift')
+        daemon = RingMasterd('/var/run/swift-ring-master.pid', user=user)
         if 'start' == sys.argv[1]:
-            conf = readconf(options.conf)
             daemon.start(conf)
         elif 'stop' == sys.argv[1]:
             daemon.stop()
         elif 'restart' == sys.argv[1]:
-            daemon.restart()
+            daemon.restart(conf)
         else:
             args.print_help()
             sys.exit(2)

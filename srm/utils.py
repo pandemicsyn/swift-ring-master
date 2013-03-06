@@ -3,6 +3,7 @@ Random utils
 """
 from hashlib import md5
 from os import mkdir
+import pwd
 from swift.common.ring import Ring
 from os.path import basename, join as pathjoin
 from shutil import copy
@@ -75,6 +76,7 @@ def is_valid_ring(ring_file):
         return False
     return True
 
+
 # http://www.jejik.com/articles/2007/02/a_simple_unix_linux_daemon_in_python/
 
 
@@ -86,11 +88,13 @@ class Daemon:
     """
 
     def __init__(self, pidfile, stdin='/dev/null', stdout='/dev/null',
-                 stderr='/dev/null'):
+                 stderr='/dev/null', user=None, group=None):
         self.stdin = stdin
         self.stdout = stdout
         self.stderr = stderr
         self.pidfile = pidfile
+        self.uid = user
+        self.gid = group
 
     def daemonize(self):
         """
@@ -138,6 +142,19 @@ class Daemon:
         atexit.register(self.delpid)
         pid = str(os.getpid())
         file(self.pidfile, 'w+').write("%s\n" % pid)
+        user = pwd.getpwnam(self.uid)
+        if os.geteuid() == 0:
+            os.setgroups([])
+        os.setgid(user[3])
+        os.setuid(user[2])
+        os.environ['HOME'] = user[5]
+        try:
+            os.setsid()
+        except OSError:
+            pass
+        os.chdir(
+            '/')  # in case you need to rmdir on where you started the daemon
+        os.umask(022)  # ensure files are created with the correct privileges
 
     def delpid(self):
         """Remove pid file"""
@@ -193,3 +210,8 @@ class Daemon:
             else:
                 print str(err)
                 sys.exit(1)
+
+    def restart(self, *args, **kw):
+        """Restart the daemon"""
+        self.stop()
+        self.start(*args, **kw)
