@@ -400,7 +400,7 @@ class RingMasterd(Daemon):
 
 def run_server():
     usage = '''
-    %prog start|stop|restart [--conf=/path/to/some.conf] [--foreground|-f]
+    %prog start|stop|restart|pause|unpause [--conf=/path/to/some.conf] [-f]
     '''
     args = optparse.OptionParser(usage)
     args.add_option('--foreground', '-f', action="store_true",
@@ -421,6 +421,7 @@ def run_server():
     if len(sys.argv) >= 2:
         conf = readconf(options.conf)
         user = conf['ringmasterd'].get('user', 'swift')
+        pfile = conf['ringmasterd'].get('pause_file_path', '/tmp/.srm-pause')
         daemon = RingMasterd('/var/run/swift-ring-master.pid', user=user)
         if 'start' == sys.argv[1]:
             daemon.start(conf)
@@ -428,6 +429,13 @@ def run_server():
             daemon.stop()
         elif 'restart' == sys.argv[1]:
             daemon.restart(conf)
+        elif 'pause' == sys.argv[1]:
+            print "Writing pause file"
+            with open(pfile, 'w') as f:
+                f.write("")
+        elif 'unpause':
+            print "Removing pause file"
+            unlink(pfile)
         else:
             args.print_help()
             sys.exit(2)

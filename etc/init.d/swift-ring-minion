@@ -11,20 +11,25 @@
 # Description:       starts the swift-ring-minion server using start-stop-daemon
 ### END INIT INFO
 
-SWIFT_USER=swift
+CONF="/etc/swift/ring-minion.conf"
 
 # Carry out specific functions when asked to by the system
 case "$1" in
     start)
         echo "Starting swift-ring-minion"
-        su $SWIFT_USER -s /bin/bash -c "/usr/bin/swift-ring-minion-server start --conf=/etc/swift/ring-minion.conf"
+        /usr/bin/swift-ring-minion-server start --conf=$CONF
         ;;
     stop)
         echo "Stopping swift-ring-minion"
-        su $SWIFT_USER -s /bin/bash -c "/usr/bin/swift-ring-minion-server stop --conf=/etc/swift/ring-minion.conf"
+        /usr/bin/swift-ring-minion-server stop --conf=$CONF
+        ;;
+    restart)
+        echo "Restarting swift-ring-minion"
+        /usr/bin/swift-ring-minion-server stop --conf=$CONF
+        /usr/bin/swift-ring-minion-server start --conf=$CONF
         ;;
     *)
-        echo "Usage: /etc/init.d/swift-ring-minion {start|stop}"
+        echo "Usage: /etc/init.d/swift-ring-minion {start|stop|restart}"
         exit 1
         ;;
 esac
