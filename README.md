@@ -63,6 +63,7 @@ into account:
 - Checking dispersion reports to verify cluster health
 - ~~Verifying out of place partition percentages across the cluster~~ [no longer present in this version]
 - Only adjusting the device(s) by user defined (de|inc)rements
+- Ability to pause/resume activity
 
 swift-ring-master-wsgi
 ======================
