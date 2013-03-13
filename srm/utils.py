@@ -3,7 +3,7 @@ Random utils
 """
 from hashlib import md5
 from os import mkdir
-import pwd
+from swift.common.utils import drop_privileges
 from swift.common.ring import Ring
 from os.path import basename, join as pathjoin
 from shutil import copy
@@ -137,24 +137,11 @@ class Daemon:
         os.dup2(stin.fileno(), sys.stdin.fileno())
         os.dup2(stout.fileno(), sys.stdout.fileno())
         os.dup2(sterr.fileno(), sys.stderr.fileno())
-
         # write pidfile
         atexit.register(self.delpid)
         pid = str(os.getpid())
         file(self.pidfile, 'w+').write("%s\n" % pid)
-        user = pwd.getpwnam(self.uid)
-        if os.geteuid() == 0:
-            os.setgroups([])
-        os.setgid(user[3])
-        os.setuid(user[2])
-        os.environ['HOME'] = user[5]
-        try:
-            os.setsid()
-        except OSError:
-            pass
-        os.chdir(
-            '/')  # in case you need to rmdir on where you started the daemon
-        os.umask(022)  # ensure files are created with the correct privileges
+        drop_privileges(user=self.uid)
 
     def delpid(self):
         """Remove pid file"""

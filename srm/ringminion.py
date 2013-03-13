@@ -3,12 +3,12 @@ ring-minion
 """
 import os
 import sys
+import urllib2
 import optparse
+from time import sleep
 from random import choice
 from tempfile import mkstemp
 from os.path import basename, dirname, join as pathjoin, exists
-import eventlet
-from eventlet.green import urllib2
 from swift.common.utils import get_logger, readconf, TRUE_VALUES
 from srm.utils import Daemon, get_md5sum, md5matches, is_valid_ring
 
@@ -111,7 +111,8 @@ class RingMinion(object):
     def watch_loop(self):
         """Start monitoring ring files for changes"""
         # insert a random delay on startup so we don't flood the server
-        eventlet.sleep(choice(range(self.start_delay)))
+
+        sleep(choice(range(self.start_delay)))
         while True:
             try:
                 for ring in self.rings:
@@ -122,10 +123,12 @@ class RingMinion(object):
                         self.logger.info("%s check/change failed!!" % ring)
                     elif changed is None:
                         self.logger.info("%s remains unchanged" % ring)
-                eventlet.sleep(self.check_interval)
             except Exception:
-                self.logger.exception('Error watch loop')
-                eventlet.sleep(self.check_interval)
+                try:
+                    self.logger.exception('Error watch loop')
+                except Exception:
+                    print "Got exceptio and exception while trying to log"
+            sleep(self.check_interval)
 
     def once(self):
         """Just check for changes once."""
@@ -147,6 +150,7 @@ class RingMiniond(Daemon):
         """
         minion = RingMinion(conf)
         minion.watch_loop()
+
 
 
 def run_server():
@@ -176,8 +180,10 @@ def run_server():
     if len(sys.argv) >= 2:
         conf = readconf(options.conf)
         user = conf['minion'].get('user', 'swift')
+        out = '/tmp/oops.log'
+        err = '/tmp/oops.log'
         daemon = RingMiniond('/var/run/swift-ring-minion.pid',
-                             user=user)
+                             user=user, stdout=out, stderr=err)
         if 'start' == sys.argv[1]:
             daemon.start(conf['minion'])
         elif 'stop' == sys.argv[1]:
