@@ -41,6 +41,8 @@ log_facility = LOG_LOCAL2
 # ring orchestration kicks in and starts deploying the ring
 #min_seconds_since_change = 120
 
+# Path to the swift dispersion report binary
+#dispersion_cmd = /usr/bin/swift-dispersion-report
 # dispersion report pct found thresholds
 # if a disperion report finds less than this pct no change will be made
 #container_min_pct = 99.75
