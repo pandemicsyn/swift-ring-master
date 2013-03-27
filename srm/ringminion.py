@@ -42,61 +42,63 @@ class RingMinion(object):
             else:
                 continue
 
-    def ring_updated(self, ring_type):
-        """update a ring
+    def _write_ring(self, response, ring_type):
+        """Write the ring out to a tmp file
 
-        :param ring_type: one of: account, container, or object.
-        :param expected_md5: the expected md5sum of the retrieved ring file
-        """
-        url = "%sring/%s" % (self.ring_master, basename(self.rings[ring_type]))
+        :param response: The urllib2 response to read from
+        :param ring_type: The ring type we're working on
+        :returns: path to tmp ring file"""
         tmp = dirname(pathjoin(self.swiftdir, ring_type))
-        headers = {'If-None-Match': self.current_md5[self.rings[ring_type]]}
-        self.logger.debug("Checking on %s ring to retrieve %s" % (ring_type,
-                                                                  url))
-        request = urllib2.Request(url, headers=headers)
+        fd, tmppath = mkstemp(dir=tmp, suffix='.tmp')
         try:
+            with os.fdopen(fd, 'wb') as fdo:
+                while True:
+                    chunk = response.read(4096)
+                    if not chunk:
+                        break
+                    fdo.write(chunk)
+                fdo.flush()
+                os.fsync(fdo)
+        except Exception:
+            if tmppath:
+                os.unlink(tmppath)
+            raise
+        return tmppath
+
+    @staticmethod
+    def _validate_ring(tmppath, expected_md5):
+        """Make sure the ring is actually valid"""
+        if not md5matches(tmppath, expected_md5):
+            raise Exception('md5 missmatch')
+        if not is_valid_ring(tmppath):
+            raise Exception('Invalid ring')
+
+    def _move_in_place(self, tmppath, ring_type, expected_md5):
+        """Move the tmp ring into place"""
+        os.chmod(tmppath, 0644)
+        os.rename(tmppath, self.rings[ring_type])
+        self.current_md5[self.rings[ring_type]] = expected_md5
+
+    def fetch_ring(self, ring_type):
+        """Fetch a new ring if theres one available
+
+        :param ring_type: Ring to fetch object|container|account
+        :returns: True on ring change, None for no change, False for error"""
+        try:
+            tmp_ring_path = None
+            url = "%sring/%s" % (self.ring_master, basename(self.rings[ring_type]))
+            headers = {'If-None-Match': self.current_md5[self.rings[ring_type]]}
+            self.logger.debug("Checking on %s ring" % (ring_type))
+            request = urllib2.Request(url, headers=headers)
             response = urllib2.urlopen(
                 request, timeout=self.ring_master_timeout)
-            if response.code == 200:
-                expected_md5 = response.headers.get('etag')
-                if not expected_md5:
-                    self.logger.warning("No etag provided by ring-master")
-                    return False
-                fd, tmppath = mkstemp(dir=tmp, suffix='.tmp')
-                with os.fdopen(fd, 'wb') as fdo:
-                    while True:
-                        chunk = response.read(4096)
-                        if not chunk:
-                            break
-                        fdo.write(chunk)
-                    fdo.flush()
-                    os.fsync(fdo)
-                    if md5matches(tmppath, expected_md5):
-                        if not is_valid_ring(tmppath):
-                            os.unlink(tmppath)
-                            self.logger.error('error validating ring')
-                            return False
-                        try:
-                            os.chmod(tmppath, 0644)
-                            os.rename(tmppath, self.rings[ring_type])
-                            self.current_md5[self.rings[ring_type]] = \
-                                expected_md5
-                            return True
-                        except OSError:
-                            try:
-                                os.unlink(tmppath)
-                            except OSError:
-                                pass
-                            self.logger.exception('Error moving tmp ring file')
-                            return False
-                    else:
-                        self.logger.warning('md5 missmatch')
-                        os.unlink(tmppath)
-                        return False
-            else:
-                self.logger.warning('Got %s status with body:' % response.code)
-                self.logger.warning(response.read())
+            if not response.code == 200:
+                self.logger.warning('Received non 200 status code')
                 return False
+            tmp_ring_path = self._write_ring(response, ring_type)
+            self._validate_ring(tmp_ring_path, response.headers.get('etag'))
+            self._move_in_place(tmp_ring_path, ring_type,
+                                response.headers.get('etag'))
         except urllib2.HTTPError, e:
             if e.code == 304:
                 self.logger.debug('Ring-master reports ring unchanged.')
@@ -107,16 +109,24 @@ class RingMinion(object):
         except urllib2.URLError:
             self.logger.exception('Error communicating with ring-master')
             return False
+        except Exception:
+            if tmp_ring_path:
+                try:
+                    os.unlink(tmp_ring_path)
+                except OSError:
+                    pass
+            self.logger.exception('Error retrieving or checking for new ring')
+            return False
+        return True
 
     def watch_loop(self):
         """Start monitoring ring files for changes"""
         # insert a random delay on startup so we don't flood the server
-
         sleep(choice(range(self.start_delay)))
         while True:
             try:
                 for ring in self.rings:
-                    changed = self.ring_updated(ring)
+                    changed = self.fetch_ring(ring)
                     if changed:
                         self.logger.info("%s updated" % ring)
                     elif changed is False:
@@ -125,15 +135,15 @@ class RingMinion(object):
                         self.logger.info("%s remains unchanged" % ring)
             except Exception:
                 try:
-                    self.logger.exception('Error watch loop')
+                    self.logger.exception('Error in watch loop')
                 except Exception:
-                    print "Got exceptio and exception while trying to log"
+                    print "Got exception and exception while trying to log"
             sleep(self.check_interval)
 
     def once(self):
         """Just check for changes once."""
         for ring in self.rings:
-            changed = self.ring_updated(ring)
+            changed = self.fetch_ring(ring)
             if changed:
                 print "%s ring updated" % ring
             elif changed is False:
@@ -149,8 +159,12 @@ class RingMiniond(Daemon):
         Startup Ring Minion Daemon
         """
         minion = RingMinion(conf)
-        minion.watch_loop()
-
+        while True:
+            try:
+                minion.watch_loop()
+            except Exception as err:
+                #just in case
+                print err
 
 
 def run_server():
@@ -182,7 +196,7 @@ def run_server():
         user = conf['minion'].get('user', 'swift')
         out = '/tmp/oops.log'
         err = '/tmp/oops.log'
-        daemon = RingMiniond('/var/run/swift-ring-minion.pid',
+        daemon = RingMiniond('/var/run/swift/ring-minion-server.pid',
                              user=user, stdout=out, stderr=err)
         if 'start' == sys.argv[1]:
             daemon.start(conf['minion'])

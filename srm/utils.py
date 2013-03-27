@@ -18,8 +18,8 @@ from time import time, sleep
 def get_md5sum(filename, chunk_size=4096):
     """Get the md5sum of a file
 
-    :params filename: file to obtain the md5sum of
-    :params chunk_size: chunk size
+    :param filename: file to obtain the md5sum of
+    :param chunk_size: chunk size
     :returns: hex digest of file
     """
     md5sum = md5()
@@ -46,8 +46,8 @@ def md5matches(target_file, expected_md5):
 
 def make_backup(filename, backup_dir):
     """ Create a backup of a file
-    :params filename: The file to backup
-    :params backup_dir: The directory where to backup the file
+    :param filename: The file to backup
+    :param backup_dir: The directory where to backup the file
     :returns: List of backed up filename and md5sum of backed up file
     """
     try:
