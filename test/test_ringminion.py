@@ -7,7 +7,7 @@ from mock import MagicMock, patch
 from swift.common.ring import RingBuilder
 from srm.ringminion import RingMinion
 from srm.utils import get_md5sum
-from StringIO import StringIO
+from swift.common import utils
 import urllib2
 
 class MockResponse(object):
@@ -62,6 +62,8 @@ class FakedBuilder(object):
 class test_ringmasterminion(unittest.TestCase):
 
     def setUp(self):
+        utils.HASH_PATH_SUFFIX = 'endcap'
+        utils.HASH_PATH_PREFIX = ''
         self.testdir = mkdtemp()
         self.patcher = patch('urllib2.urlopen')
         self.urlopen_mock = self.patcher.start()

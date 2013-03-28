@@ -6,6 +6,7 @@ import unittest
 import cPickle as pickle
 from shutil import rmtree
 from tempfile import mkdtemp
+from swift.common import utils
 from swift.common.ring import RingBuilder
 from mock import patch, Mock, MagicMock, call
 from srm.ringmasterd import RingMasterServer
@@ -44,6 +45,8 @@ class FakedBuilder(object):
 class test_ringmasterserver(unittest.TestCase):
 
     def setUp(self):
+        utils.HASH_PATH_SUFFIX = 'endcap'
+        utils.HASH_PATH_PREFIX = ''
         self.testdir = mkdtemp()
         self.confdict = {'swiftdir': self.testdir,
                          'debug_mode': 'y',
