@@ -40,7 +40,8 @@ class RingMinion(object):
                 self.current_md5[self.rings[ring]] = \
                     get_md5sum(self.rings[ring])
             else:
-                continue
+                self.current_md5[self.rings[ring]] = ''
+
 
     def _write_ring(self, response, ring_type):
         """Write the ring out to a tmp file
