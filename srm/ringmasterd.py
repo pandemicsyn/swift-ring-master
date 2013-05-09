@@ -2,6 +2,7 @@
 Ring Master Daemon for ring orchestration
 """
 
+import os
 import sys
 import optparse
 import subprocess
@@ -58,6 +59,9 @@ class RingMasterServer(object):
         if self.debug:
             conf['log_level'] = 'DEBUG'
         self.logger = get_logger(conf, 'ringmasterd', self.debug)
+        if not os.access(self.swiftdir, os.W_OK):
+            self.logger.error('swift_dir is not writable. exiting!')
+            sys.exit(1)
 
     def pause_if_asked(self):
         """Check if pause file exists and sleep until its removed if it does"""
@@ -409,6 +413,8 @@ def run_server():
                     help="Run in foreground, in debug mode")
     args.add_option('--conf', default="/etc/swift/ring-master.conf",
                     help="path to config. default /etc/swift/ring-master.conf")
+    args.add_option('--pid', default="/var/run/swift-ring-master.pid",
+                    help="default: /var/run/swift-ring-master.pid")
     options, arguments = args.parse_args()
 
     if len(sys.argv) <= 1:
@@ -424,7 +430,7 @@ def run_server():
         conf = readconf(options.conf)
         user = conf['ringmasterd'].get('user', 'swift')
         pfile = conf['ringmasterd'].get('pause_file_path', '/tmp/.srm-pause')
-        daemon = RingMasterd('/var/run/swift-ring-master.pid', user=user)
+        daemon = RingMasterd(options.pid, user=user)
         if 'start' == sys.argv[1]:
             daemon.start(conf)
         elif 'stop' == sys.argv[1]:

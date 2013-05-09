@@ -160,7 +160,7 @@ class test_ringmasterminion(unittest.TestCase):
         minion.logger.exception.reset_mock()
         result = minion.fetch_ring('object')
         self.assertFalse(result)
-        minion.logger.exception.assert_called_with('Error retrieving or checking for new ring')
+        minion.logger.exception.assert_called_with('Error retrieving or checking on ring')
         minion.logger.exception.reset_mock()
 
 if __name__ == '__main__':

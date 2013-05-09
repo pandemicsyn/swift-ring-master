@@ -159,6 +159,12 @@ class Daemon:
         except IOError:
             pid = None
 
+        # make sure we have access to write a pid file
+        if not os.access(os.path.dirname(self.pidfile), os.W_OK):
+            message = "No write access to create pid file %s\n"
+            sys.stderr.write(message % self.pidfile)
+            sys.exit(1)
+
         if pid:
             message = "pidfile %s already exist. Daemon already running?\n"
             sys.stderr.write(message % self.pidfile)

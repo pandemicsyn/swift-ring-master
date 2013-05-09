@@ -144,6 +144,8 @@ def run_server():
                     help="Run in foreground, in debug mode")
     args.add_option('--conf', default="/etc/swift/ring-master.conf",
                     help="path to config. default /etc/swift/ring-master.conf")
+    args.add_option('--pid', default="/var/run/swift-ring-master-wsgi.pid",
+                    help="default: /var/run/swift-ring-master-wsgi.pid")
     options, arguments = args.parse_args()
 
     if len(sys.argv) <= 1:
@@ -158,8 +160,7 @@ def run_server():
     if len(sys.argv) >= 2:
         conf = readconf(options.conf)
         user = conf['ringmaster_wsgi'].get('user', 'swift')
-        daemon = RingMasterAppd('/var/run/swift-ring-master-wsgi.pid',
-                                user=user)
+        daemon = RingMasterAppd(options.pid, user=user)
         if 'start' == sys.argv[1]:
             daemon.start(conf['ringmaster_wsgi'])
         elif 'stop' == sys.argv[1]:

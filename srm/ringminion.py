@@ -35,13 +35,15 @@ class RingMinion(object):
         if self.debug:
             conf['log_level'] = 'DEBUG'
         self.logger = get_logger(conf, 'ringminiond', self.debug)
+        if not os.access(self.swiftdir, os.W_OK):
+            self.logger.error('swift_dir is not writable. exiting!')
+            sys.exit(1)
         for ring in self.rings:
             if exists(self.rings[ring]):
                 self.current_md5[self.rings[ring]] = \
                     get_md5sum(self.rings[ring])
             else:
                 self.current_md5[self.rings[ring]] = ''
-
 
     def _write_ring(self, response, ring_type):
         """Write the ring out to a tmp file
@@ -87,8 +89,10 @@ class RingMinion(object):
         :returns: True on ring change, None for no change, False for error"""
         try:
             tmp_ring_path = None
-            url = "%sring/%s" % (self.ring_master, basename(self.rings[ring_type]))
-            headers = {'If-None-Match': self.current_md5[self.rings[ring_type]]}
+            url = "%sring/%s" % (
+                self.ring_master, basename(self.rings[ring_type]))
+            headers = {'If-None-Match': self.current_md5[
+                self.rings[ring_type]]}
             self.logger.debug("Checking on %s ring" % (ring_type))
             request = urllib2.Request(url, headers=headers)
             response = urllib2.urlopen(
@@ -116,7 +120,7 @@ class RingMinion(object):
                     os.unlink(tmp_ring_path)
                 except OSError:
                     pass
-            self.logger.exception('Error retrieving or checking for new ring')
+            self.logger.exception('Error retrieving or checking on ring')
             return False
         return True
 
@@ -164,7 +168,7 @@ class RingMiniond(Daemon):
             try:
                 minion.watch_loop()
             except Exception as err:
-                #just in case
+                # just in case
                 print err
 
 
@@ -178,6 +182,8 @@ def run_server():
     args.add_option('--once', '-o', action="store_true", help="Run once")
     args.add_option('--conf', default="/etc/swift/ring-minion.conf",
                     help="path to config. default /etc/swift/ring-minion.conf")
+    args.add_option('--pid', default='/var/run/swift/ring-minion-server.pid',
+                    help="default: /var/run/swift-ring-minion-server.pid")
     options, arguments = args.parse_args()
 
     if len(sys.argv) <= 1:
@@ -195,10 +201,7 @@ def run_server():
     if len(sys.argv) >= 2:
         conf = readconf(options.conf)
         user = conf['minion'].get('user', 'swift')
-        out = '/tmp/oops.log'
-        err = '/tmp/oops.log'
-        daemon = RingMiniond('/var/run/swift/ring-minion-server.pid',
-                             user=user, stdout=out, stderr=err)
+        daemon = RingMiniond(options.pid, user=user)
         if 'start' == sys.argv[1]:
             daemon.start(conf['minion'])
         elif 'stop' == sys.argv[1]:
