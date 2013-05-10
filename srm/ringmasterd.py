@@ -16,7 +16,8 @@ from swift.common import exceptions
 from swift.common.ring import RingBuilder
 from swift.common.utils import get_logger, readconf, TRUE_VALUES, json, \
     lock_parent_directory
-from srm.utils import get_md5sum, make_backup, Daemon, is_valid_ring
+from srm.utils import get_md5sum, make_backup, Daemon, is_valid_ring, \
+    EmailNotify
 
 
 class RingMasterServer(object):
@@ -40,7 +41,8 @@ class RingMasterServer(object):
                                 '/etc/swift/object.ring.gz')}
         self.debug = conf.get('debug_mode', 'n') in TRUE_VALUES
         self.pause_file = conf.get('pause_file_path', '/tmp/.srm-pause')
-        self.weight_shift = float(conf.get('weight_shift', '25.0'))
+        self.default_weight_shift = float(conf.get('default_weight_shift',
+                                                   '25.0'))
         self.backup_dir = conf.get('backup_dir', '/etc/swift/backups')
         self.recheck_interval = int(conf.get('interval', '120'))
         self.recheck_after_change_interval = int(conf.get('change_interval',
@@ -62,6 +64,15 @@ class RingMasterServer(object):
         if not os.access(self.swiftdir, os.W_OK):
             self.logger.error('swift_dir is not writable. exiting!')
             sys.exit(1)
+        if conf.get('email_notify', 'n') in TRUE_VALUES:
+            self.email_notify = EmailNotify(conf, self.logger)
+        else:
+            self.email_notify = None
+
+    def _emit_notify(self, source, message):
+        "Send out any configured notifications"
+        if self.email_notify:
+            self.email_notify.send_message(source, message)
 
     def pause_if_asked(self):
         """Check if pause file exists and sleep until its removed if it does"""
@@ -108,13 +119,17 @@ class RingMasterServer(object):
             if not dev:
                 continue
             if 'target_weight' in dev:
+                if 'weight_shift' in dev:
+                    weight_shift = dev['weight_shift']
+                else:
+                    weight_shift = self.default_weight_shift
                 if dev['weight'] == dev['target_weight']:
                     continue
                 elif dev['weight'] < dev['target_weight']:
-                    if dev['weight'] + self.weight_shift \
+                    if dev['weight'] + weight_shift \
                             < dev['target_weight']:
                         builder.set_dev_weight(
-                            dev['id'], dev['weight'] + self.weight_shift)
+                            dev['id'], dev['weight'] + weight_shift)
                     else:
                         builder.set_dev_weight(dev['id'], dev['target_weight'])
                     self.logger.debug(
@@ -122,10 +137,10 @@ class RingMasterServer(object):
                                                          dev['device'],
                                                          dev['weight']))
                 elif dev['weight'] > dev['target_weight']:
-                    if dev['weight'] - self.weight_shift \
+                    if dev['weight'] - weight_shift \
                             > dev['target_weight']:
                         builder.set_dev_weight(
-                            dev['id'], dev['weight'] - self.weight_shift)
+                            dev['id'], dev['weight'] - weight_shift)
                     else:
                         builder.set_dev_weight(dev['id'], dev['target_weight'])
                     self.logger.debug(
@@ -364,6 +379,8 @@ class RingMasterServer(object):
                 ring_md5 = self.write_ring(btype, builder)
                 self.logger.notice("[%s] --> Wrote new ring with md5: %s" %
                                    (btype, ring_md5))
+                self._emit_notify('%s ring change' % btype,
+                                  'Wrote new ring with md5: %s' % ring_md5)
                 return True
             except Exception:
                 self.logger.exception('Error dumping builder or ring')
