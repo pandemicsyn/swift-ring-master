@@ -11,8 +11,42 @@ from errno import EEXIST
 import sys
 import os
 import atexit
+import smtplib
 from signal import SIGTERM
 from time import time, sleep
+
+
+class EmailNotify(object):
+    """Email (smtplib) based Notifications"""
+
+    def __init__(self, conf, logger):
+        self.conf = conf
+        self.logger = logger
+        self.smtp_host = conf.get('smtplib_host', 'localhost')
+        self.smtp_port = int(conf.get('smtplib_port', '25'))
+        self.from_addr = conf.get('smtplib_from_addr', 'ringmaster@localhost')
+        self.recipients = [x.strip() for x in conf.get(
+            'smtplib_recipients').split(',')]
+        if not self.recipients:
+            raise Exception('No smtplib recipients in conf.')
+
+    def send_message(self, subject, body):
+        """Send email with the provided subject and body"""
+        message = """From: %s
+        To: %s
+        Subject: %s
+
+        %s
+        """ % (self.from_addr, self.recipients, subject, body)
+        try:
+            conn = smtplib.SMTP(self.smtp_host, self.smtp_port)
+            conn.ehlo()
+            conn.sendmail(self.from_addr, self.recipients, message)
+            conn.close()
+            return True
+        except Exception:
+            self.logger.exception('Email notification error.')
+            return False
 
 
 def get_md5sum(filename, chunk_size=4096):

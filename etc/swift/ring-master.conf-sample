@@ -58,3 +58,11 @@ log_facility = LOG_LOCAL2
 #server_ring_port = 8090
 # Bind to this address (or empty for all)
 #server_ring_address =
+#
+# If you want to send an email notification when a new ring file is written
+# adjust these config options
+#email_notify = n
+#smtplib_host = localhost
+#smtplib_port = 25
+#smtplib_from_addr = ringmaster@localhost
+#smtplib_recipients = user@domain.com,user2@domain2.com

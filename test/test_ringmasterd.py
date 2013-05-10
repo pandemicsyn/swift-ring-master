@@ -32,10 +32,10 @@ class FakedBuilder(object):
             builder.add_dev({'id': next_dev_id, 'zone': zone, 'ip': ipaddr,
                              'port': int(port), 'device': device_name,
                              'weight': weight, 'meta': meta})
-            # add an empty dev
-            builder.devs.append(None)
-            if balanced:
-                builder.rebalance()
+        # add an empty dev
+        builder.devs.append(None)
+        if balanced:
+            builder.rebalance()
         return builder
 
     def write_builder(self, tfile, builder):
@@ -50,7 +50,7 @@ class test_ringmasterserver(unittest.TestCase):
         self.testdir = mkdtemp()
         self.confdict = {'swiftdir': self.testdir,
                          'debug_mode': 'y',
-                         'weight_shift': '5.0',
+                         'default_weight_shift': '5.0',
                          'interval': 1, 'change_interval': 2,
                          'backup_dir': os.path.join(self.testdir, 'backup'),
                          'account_builder': os.path.join(self.testdir, 'account.builder'),
@@ -116,6 +116,11 @@ class test_ringmasterserver(unittest.TestCase):
         builder.devs[1]['target_weight'] = 87.0
         rmd.adjust_ring(builder)
         self.assertEquals(builder.devs[1]['weight'], 87.0)
+        # test weight shift with custom weight shift
+        builder.devs[1]['target_weight'] = 70.0
+        builder.devs[1]['weight_shift'] = 17
+        rmd.adjust_ring(builder)
+        self.assertEquals(builder.devs[1]['weight'], 70.0)
 
     def test_ring_requires_change(self):
         fb = FakedBuilder(device_count=4)
