@@ -137,7 +137,7 @@ class RingMinion(object):
                     elif changed is False:
                         self.logger.info("%s check/change failed!!" % ring)
                     elif changed is None:
-                        self.logger.info("%s remains unchanged" % ring)
+                        self.logger.debug("%s remains unchanged" % ring)
             except Exception:
                 try:
                     self.logger.exception('Error in watch loop')

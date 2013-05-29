@@ -3,8 +3,8 @@ import optparse
 from os import stat
 from os.path import exists, join as pathjoin
 from eventlet import wsgi, listen
-from swift.common.utils import split_path, get_logger, readconf
-from srm.utils import Daemon, get_md5sum
+from swift.common.utils import split_path, readconf
+from srm.utils import Daemon, get_md5sum, get_file_logger
 
 
 class FileIterable(object):
@@ -53,7 +53,8 @@ class RingMasterApp(object):
         self.swiftdir = conf.get('swiftdir', '/etc/swift')
         self.wsgi_port = int(conf.get('serve_ring_port', '8090'))
         self.wsgi_address = conf.get('serve_ring_address', '')
-        self.logger = get_logger(conf, 'ringmaster_wsgi', True)
+        log_path = conf.get('log_path', '/var/log/ring-master/wsgi.log')
+        self.logger = get_file_logger('ring-master-wsgi', log_path)
         self.last_tstamp = {}
         self.current_md5 = {}
         for rfile in self.ring_files:

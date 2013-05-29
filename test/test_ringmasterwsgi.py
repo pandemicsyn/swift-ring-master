@@ -48,6 +48,7 @@ class test_ringmasterwsgi(unittest.TestCase):
 
     def setUp(self):
         self.testdir = mkdtemp()
+        self.test_log_path = os.path.join(self.testdir, 'wsgi-test.log')
 
     def tearDown(self):
         try:
@@ -66,7 +67,7 @@ class test_ringmasterwsgi(unittest.TestCase):
 
     def test_ringmasterapp_methods(self):
         self._setup_builder_rings()
-        rma = RingMasterApp({'swiftdir': self.testdir})
+        rma = RingMasterApp({'swiftdir': self.testdir, 'log_path': self.test_log_path})
         for i in rma.current_md5:
             self.assertEquals(rma._changed(i), False)
         self._setup_builder_rings(count=5)
@@ -81,7 +82,7 @@ class test_ringmasterwsgi(unittest.TestCase):
     def test_handle_request(self):
         self._setup_builder_rings()
         start_response = MagicMock()
-        rma = RingMasterApp({'swiftdir': self.testdir})
+        rma = RingMasterApp({'swiftdir': self.testdir, 'log_path': self.test_log_path})
         # test bad path
         req = Request.blank('/invalidrandomness',
                             environ={'REQUEST_METHOD': 'GET'})
@@ -100,7 +101,7 @@ class test_ringmasterwsgi(unittest.TestCase):
     def test_handle_ring(self):
         self._setup_builder_rings()
         start_response = MagicMock()
-        rma = RingMasterApp({'swiftdir': self.testdir})
+        rma = RingMasterApp({'swiftdir': self.testdir, 'log_path': self.test_log_path})
 
         # test bad path
         req = Request.blank('/ring/not_a_valid_ring.gz',

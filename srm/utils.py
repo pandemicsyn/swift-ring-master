@@ -12,8 +12,18 @@ import sys
 import os
 import atexit
 import smtplib
+import eventlet 
 from signal import SIGTERM
 from time import time, sleep
+# logging doesn't import patched as cleanly as one would like
+from logging.handlers import SysLogHandler, TimedRotatingFileHandler
+import logging
+logging.thread = eventlet.green.thread
+logging.threading = eventlet.green.threading
+logging._lock = logging.threading.RLock()
+# setup notice level logging
+NOTICE = 25
+logging._levelNames[NOTICE] = 'NOTICE'
 
 
 class EmailNotify(object):
@@ -47,6 +57,17 @@ class EmailNotify(object):
         except Exception:
             self.logger.exception('Email notification error.')
             return False
+
+
+def get_file_logger(name, log_path, level=logging.INFO, count=7, fmt=None):
+    logger = logging.getLogger(name)
+    handler = TimedRotatingFileHandler(log_path, when='midnight',
+                                       backupCount=count)
+    formatter = logging.Formatter('%(asctime)s - %(name)s: %(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+    return logger
 
 
 def get_md5sum(filename, chunk_size=4096):

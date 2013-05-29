@@ -51,8 +51,8 @@ log_facility = LOG_LOCAL2
 [ringmaster_wsgi]
 # user to run as
 #user = swift
-#standard swift logger settings
-log_facility = LOG_LOCAL2
+# The wsgi app doesn't use syslog, it uses a 7 day rotating log file
+#log_path = /var/log/ring-master/wsgi.log
 #swiftdir = /etc/swift
 # Listen on this port
 #server_ring_port = 8090
