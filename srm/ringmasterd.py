@@ -51,8 +51,8 @@ class RingMasterServer(object):
         self.sec_since_modified = int(conf.get('min_seconds_since_change',
                                                '120'))
         self.balance_threshold = float(conf.get('balance_threshold', '2'))
-        self.dispersion_cmd = {'dispersion_cmd':
-                               '/usr/bin/swift-dispersion-report'}
+        self.dispersion_cmd = conf.get('dispersion_cmd',
+                                       '/usr/bin/swift-dispersion-report')
         self.dispersion_pct = {'container': float(conf.get('container_min_pct',
                                                            '99.75')),
                                'object': float(conf.get('object_min_pct',
