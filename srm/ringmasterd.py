@@ -8,7 +8,7 @@ import optparse
 import subprocess
 import cPickle as pickle
 from os.path import exists
-from time import time, sleep
+from time import time, sleep, gmtime
 from tempfile import mkstemp
 from datetime import datetime
 from os import stat, unlink, rename, close, fdopen, chmod
@@ -58,6 +58,8 @@ class RingMasterServer(object):
                                'object': float(conf.get('object_min_pct',
                                                         '99.75'))}
         self.lock_timeout = int(conf.get('lock_timeout', '90'))
+        window = conf.get('change_window', '0000,2400')
+        self.change_window = [int(x) for x in window.split(',')]
         if self.debug:
             conf['log_level'] = 'DEBUG'
         self.logger = get_logger(conf, 'ringmasterd', self.debug)
@@ -171,6 +173,16 @@ class RingMasterServer(object):
                                       dev['target_weight']))
                     return True
         return False
+
+    def in_change_window(self):
+        """Check if we are within the allowed time window for a change"""
+        start = self.change_window[0]
+        end = self.change_window[1]
+        now = gmtime().tm_hour + gmtime().tm_min
+        if start <= end:
+            return start <= now <= end
+        else:
+            return start <= now or now <= end
 
     def dispersion_ok(self, swift_type):
         """Run a dispersion report and check whether its 'ok'
@@ -395,14 +407,18 @@ class RingMasterServer(object):
         while True:
             try:
                 self.pause_if_asked()
-                for btype in self.builder_files:
-                    with lock_parent_directory(self.builder_files[btype],
-                                               self.lock_timeout):
-                        ring_changed = self.orchestration_pass(btype)
-                    if ring_changed:
-                        sleep(self.recheck_after_change_interval)
-                    else:
-                        sleep(self.recheck_interval)
+                if self.in_change_window():
+                    for btype in sorted(self.builder_files.keys()):
+                        with lock_parent_directory(self.builder_files[btype],
+                                                   self.lock_timeout):
+                            ring_changed = self.orchestration_pass(btype)
+                        if ring_changed:
+                            sleep(self.recheck_after_change_interval)
+                        else:
+                            sleep(self.recheck_interval)
+                else:
+                    self.logger.debug('Not in change window')
+                    sleep(60)
             except exceptions.LockTimeout:
                 self.logger.exception('Orchestration LockTimeout Encountered')
             except Exception:
