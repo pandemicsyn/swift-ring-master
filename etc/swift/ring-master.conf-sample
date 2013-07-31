@@ -32,6 +32,10 @@ log_facility = LOG_LOCAL2
 # how long to wait to check again after making a change
 #change_interval = 3600
 
+# Only make changes during this time window
+# i.e.:  0615,1140 would only allow changes between 6:15am and 11:40am
+#change_window = 0000,2400
+
 # Ring balance threshold. Above this value we'll simply keep try to rebalance
 # on each pass before making further changes
 #balance_threshold = 2.0
