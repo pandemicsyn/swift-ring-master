@@ -205,9 +205,12 @@ class RingMasterServer(object):
             self.logger.notice("--> Dispersion report run returned nothing!")
             return False
         self.logger.debug("--> Dispersion info: %s" % result)
-        if result[swift_type]['missing_2'] == 0 and \
-                result[swift_type]['pct_found'] > \
-                self.dispersion_pct[swift_type]:
+        #the dsp report json output has changed a bit so we have to check for all
+        if not result[swift_type].get('missing_2', 0) == 0 and \
+                result[swift_type].get('missing_3', 0) == 0 and \
+                result[swift_type].get('missing_all', 0) == 0:
+            return False
+        if result[swift_type]['pct_found'] > self.dispersion_pct[swift_type]:
             return True
         else:
             return False

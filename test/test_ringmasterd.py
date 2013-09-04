@@ -173,6 +173,17 @@ class test_ringmasterserver(unittest.TestCase):
         self.assertEquals(rmd.logger.debug.call_count, 4)
         self.assertEquals(rmd.logger.exception.call_count, 0)
         rmd.logger.reset_mock()
+        # test that container and obj are ok on missing a small pct
+        dsp_rpt_spct = dsp_rpt
+        dsp_rpt_spct['container']['pct_found'] = 99.9995
+        dsp_rpt_spct['object']['pct_found'] = 99.9995
+        popen.return_value.communicate.return_value = [json.dumps(dsp_rpt_spct)]
+        print json.dumps(dsp_rpt_spct)
+        self.assertTrue(rmd.dispersion_ok('container'))
+        self.assertTrue(rmd.dispersion_ok('object'))
+        self.assertEquals(rmd.logger.debug.call_count, 4)
+        self.assertEquals(rmd.logger.exception.call_count, 0)
+        rmd.logger.reset_mock()
         # test that container and obj fail on missing 2 replicas
         dsp_rpt_missing = dsp_rpt
         dsp_rpt_missing['container']['missing_2'] = 42
@@ -186,6 +197,8 @@ class test_ringmasterserver(unittest.TestCase):
         rmd.logger.reset_mock()
         # test that container and obj fail on missing large pct
         dsp_rpt_pct = dsp_rpt
+        dsp_rpt_pct['container']['missing_2'] = 0
+        dsp_rpt_pct['object']['missing_2'] = 0
         dsp_rpt_pct['container']['pct_found'] = 42.0
         dsp_rpt_pct['object']['pct_found'] = 42.0
         popen.return_value.communicate.return_value = [json.dumps(dsp_rpt_pct)]
