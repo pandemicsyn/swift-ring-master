@@ -12,21 +12,22 @@
 ### END INIT INFO
 
 CONF="/etc/swift/ring-minion.conf"
+DIRNAME=$(dirname `which swift-ring-minion-server`)
 
 # Carry out specific functions when asked to by the system
 case "$1" in
     start)
         echo "Starting swift-ring-minion"
-        /usr/bin/swift-ring-minion-server start --conf=$CONF
+        $DIRNAME/swift-ring-minion-server start --conf=$CONF
         ;;
     stop)
         echo "Stopping swift-ring-minion"
-        /usr/bin/swift-ring-minion-server stop --conf=$CONF
+        $DIRNAME/swift-ring-minion-server stop --conf=$CONF
         ;;
     restart)
         echo "Restarting swift-ring-minion"
-        /usr/bin/swift-ring-minion-server stop --conf=$CONF
-        /usr/bin/swift-ring-minion-server start --conf=$CONF
+        $DIRNAME/swift-ring-minion-server stop --conf=$CONF
+        $DIRNAME/swift-ring-minion-server start --conf=$CONF
         ;;
     *)
         echo "Usage: /etc/init.d/swift-ring-minion {start|stop|restart}"

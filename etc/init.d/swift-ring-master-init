@@ -12,30 +12,31 @@
 ### END INIT INFO
 
 CONF="/etc/swift/ring-master.conf"
+DIRNAME=$(dirname `which swift-ring-master-server`)
 
 # Carry out specific functions when asked to by the system
 case "$1" in
     start)
         echo "Starting swift-ring-master"
-        /usr/bin/swift-ring-master-server start --conf=$CONF
+        $DIRNAME/swift-ring-master-server start --conf=$CONF
         ;;
     stop)
         echo "Stopping swift-ring-master"
-        /usr/bin/swift-ring-master-server stop --conf=$CONF
+        $DIRNAME/swift-ring-master-server stop --conf=$CONF
         ;;
     restart)
         echo "Restarting swift-ring-master"
-        /usr/bin/swift-ring-master-server stop --conf=$CONF
+        $DIRNAME/swift-ring-master-server stop --conf=$CONF
         sleep 1
-        /usr/bin/swift-ring-master-server start --conf=$CONF
+        $DIRNAME/swift-ring-master-server start --conf=$CONF
         ;;
     pause)
         echo "Pausing swift-ring-master"
-        /usr/bin/swift-ring-master-server pause --conf=$CONF
+        $DIRNAME/swift-ring-master-server pause --conf=$CONF
         ;;
     unpause)
         echo "Unpausing swift-ring-master"
-        /usr/bin/swift-ring-master-server unpause --conf=$CONF
+        $DIRNAME/swift-ring-master-server unpause --conf=$CONF
         ;;
     *)
         echo "Usage: /etc/init.d/swift-ring-master {start|stop|restart|pause|unpause}"
