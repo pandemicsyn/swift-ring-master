@@ -3,7 +3,8 @@ import optparse
 from os import stat
 from os.path import exists, join as pathjoin
 from eventlet import wsgi, listen
-from swift.common.utils import split_path, readconf
+from swift.common.exceptions import LockTimeout
+from swift.common.utils import split_path, readconf, lock_parent_directory
 from srm.utils import Daemon, get_md5sum, get_file_logger
 
 
@@ -51,6 +52,7 @@ class RingMasterApp(object):
         self.ring_files = ['account.ring.gz', 'container.ring.gz',
                            'object.ring.gz']
         self.swiftdir = conf.get('swiftdir', '/etc/swift')
+        self.lock_timeout = float(conf.get('locktimeout', '5'))
         self.wsgi_port = int(conf.get('serve_ring_port', '8090'))
         self.wsgi_address = conf.get('serve_ring_address', '')
         log_path = conf.get('log_path', '/var/log/ring-master/wsgi.log')
@@ -78,8 +80,9 @@ class RingMasterApp(object):
         """Validate md5 of file"""
         if self._changed(filename):
             self.logger.debug("updating md5")
-            self.last_tstamp[filename] = stat(filename).st_mtime
-            self.current_md5[filename] = get_md5sum(filename)
+            with lock_parent_directory(self.swiftdir, self.lock_timeout):
+                self.last_tstamp[filename] = stat(filename).st_mtime
+                self.current_md5[filename] = get_md5sum(filename)
 
     def handle_ring(self, env, start_response):
         """handle requests to /ring"""
@@ -91,6 +94,11 @@ class RingMasterApp(object):
         target = pathjoin(self.swiftdir, ringfile)
         try:
             self._validate_file(target)
+        except LockTimeout:
+            self.logger.exception('swiftdir locked for update')
+            start_response('503 Service Unavailable',
+                           [('Content-Type', 'application/octet-stream')])
+            return ['Service Unavailable\r\n']
         except (OSError, IOError):
             self.logger.exception('Oops')
             start_response('503 Service Unavailable',

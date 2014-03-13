@@ -7,6 +7,8 @@ from tempfile import mkdtemp
 from mock import MagicMock
 from swift.common.swob import Request
 from swift.common.ring import RingBuilder
+from swift.common.utils import lock_parent_directory
+from swift.common.exceptions import LockTimeout
 from srm.ringmasterwsgi import RingMasterApp
 from srm.utils import get_md5sum
 
@@ -78,6 +80,19 @@ class test_ringmasterwsgi(unittest.TestCase):
             self.assertTrue(rma._changed(i))
             rma._validate_file(i)
             self.assertFalse(rma._changed(i))
+
+    def test_ringmaster_validate_locked_dir(self):
+        self._setup_builder_rings()
+        rma = RingMasterApp({'swiftdir': self.testdir, 'log_path': self.test_log_path, 'locktimeout': "0.1"})
+        for i in rma.current_md5:
+            self.assertEquals(rma._changed(i), False)
+        self._setup_builder_rings(count=5)
+        for i in rma.current_md5:
+            t = time.time() - 300
+            os.utime(i, (t, t))
+        with lock_parent_directory(self.testdir):
+            for i in rma.current_md5:
+                self.assertRaises(LockTimeout, rma._validate_file, i)
 
     def test_handle_request(self):
         self._setup_builder_rings()
