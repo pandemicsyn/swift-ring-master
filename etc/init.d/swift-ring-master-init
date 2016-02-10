@@ -14,6 +14,10 @@
 CONF="/etc/swift/ring-master.conf"
 DIRNAME=$(dirname `which swift-ring-master-server`)
 
+if [ ! -e /var/run/swift ]; then
+  mkdir /var/run/swift
+fi
+
 # Carry out specific functions when asked to by the system
 case "$1" in
     start)
